@@ -24,6 +24,9 @@ def registrar(revenda_id, cliente_id, limite_atual, limite_solicitado, prazo_dia
     if prazo_dias is not None and prazo_dias not in PRAZOS_VALIDOS:
         raise ValueError("Prazo inválido.")
     tipo = "Limite e prazo" if limite_solicitado is not None and prazo_dias is not None else "Limite" if limite_solicitado is not None else "Prazo"
+    if not ERP_LOCAL.exists():  # publicação online: só os Parquet vão para o servidor, o ERP fica na máquina
+        raise ValueError("Esta publicação é só para consulta: as solicitações são gravadas no ERP local, "
+                         "que existe quando o projeto roda na sua máquina (python -m elt).")
 
     with closing(sqlite3.connect(ERP_LOCAL)) as con, con:  # o segundo "con" abre a transação
         numero = con.execute("SELECT coalesce(max(solicitacao_id), 0) + 1 FROM solicitacoes_credito").fetchone()[0]

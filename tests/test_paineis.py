@@ -285,3 +285,37 @@ def test_solicitacao_grava_so_no_erp_local(tmp_path, monkeypatch):
         linha = con.execute("SELECT tipo, situacao, origem, limite_solicitado FROM solicitacoes_credito WHERE solicitacao_id = ?",
                             (numero,)).fetchone()
     assert linha == ("Limite e prazo", "Em análise", "painel", 6000.0)
+
+
+def test_solicitacao_sem_erp_local_avisa_e_nao_cria_arquivo(tmp_path, monkeypatch):
+    """Na publicação online só os Parquet vão para o servidor: sem ERP local, a solicitação é recusada
+    com uma mensagem (ValueError, que o painel mostra), e nenhum banco vazio é criado."""
+    ausente = tmp_path / "erp.sqlite"
+    monkeypatch.setattr(solicitacao, "ERP_LOCAL", ausente)
+    with pytest.raises(ValueError, match="só para consulta"):
+        solicitacao.registrar(20, 20003, 3000.0, 6000, 14, "V201", "teste")
+    assert not ausente.exists()
+
+
+def test_app_da_hospedagem_serve_os_tres_paineis(publicado, monkeypatch):
+    """app.py (entrada do Posit Connect Cloud): `app` é um objeto Dash, chamado direto como WSGI
+    (app:app), e atende a página inicial e os três painéis, mesmo com o prefixo de URL que
+    hospedagens de Dash exportam no ambiente."""
+    import importlib.util
+
+    from dash import Dash
+    from werkzeug.test import Client
+
+    from paineis.comum.dados import RAIZ
+
+    monkeypatch.setenv("DASH_REQUESTS_PATHNAME_PREFIX", "/")
+    monkeypatch.setenv("DASH_URL_BASE_PATHNAME", "/")
+    especificacao = importlib.util.spec_from_file_location("app_hospedagem", RAIZ / "app.py")
+    modulo = importlib.util.module_from_spec(especificacao)
+    especificacao.loader.exec_module(modulo)
+
+    assert isinstance(modulo.app, Dash) and modulo.app.server is modulo.server
+    cliente = Client(modulo.app)
+    for caminho in ("/", "/estoque/", "/comercial/", "/credito/",
+                    "/estoque/_dash-layout", "/comercial/_dash-layout", "/credito/_dash-layout"):
+        assert cliente.get(caminho).status_code == 200, caminho

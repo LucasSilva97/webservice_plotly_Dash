@@ -1,0 +1,10 @@
+# Projeto inteiro na sua máquina: os painéis (requirements.txt) + pipeline e testes. Python 3.12.
+# Fica fora do requirements.txt porque a hospedagem só serve os painéis, e o dbt-core 1.12 baixa um
+# binário de ~275 MB ao ser instalado no Linux.
+-r requirements.txt
+# Pipeline
+duckdb==1.5.6
+dbt-core==1.12.7
+dbt-duckdb==1.11.1
+# Testes
+pytest==9.2.0

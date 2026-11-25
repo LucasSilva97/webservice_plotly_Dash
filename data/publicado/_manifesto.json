@@ -1,0 +1,73 @@
+{
+  "data_referencia": "2026-11-18",
+  "marts": {
+    "estoque_reposicao": {
+      "linhas": 432,
+      "hash": "0383173145c522e0c42e87261534c4f62e28d7a68776593377473fa1b0a35507"
+    },
+    "estoque_transito_notas": {
+      "linhas": 14,
+      "hash": "ca004a01c48c2b5bc9bf2d1171ad0c3bf40ec6141bfb4f3c1235af4efcc13018"
+    },
+    "estoque_transferencias_recebidas": {
+      "linhas": 2,
+      "hash": "dd1c011837294cc8a0989ca99c416a4847ed7fa2f52b31e2bd655897054349b6"
+    },
+    "sellin_sellout_mes": {
+      "linhas": 1656,
+      "hash": "d2b57abd285f69d62ceaeeec35ea84f640b34b016f8d8377cc55e38669450171"
+    },
+    "periodo_analise": {
+      "linhas": 24,
+      "hash": "ce8280b776630d567767644310c94c73ddfe5c094d786d21387f57f98e418625"
+    },
+    "vendas_diarias": {
+      "linhas": 64701,
+      "hash": "ff565e2158003025d20ca776e2fafcb2a4cacbef02cce0eafe96ecc29edced1d"
+    },
+    "positivacao_cliente_mes": {
+      "linhas": 16281,
+      "hash": "2aae34c5ef7f6664d952dd2a83dae9abda3bba5f5e48601cdc411ebd08dd6bd5"
+    },
+    "metas_mes": {
+      "linhas": 576,
+      "hash": "1448ec7f5b583c09972186836a6ee343e6688ccb28e491821a1a0aa0165bdf34"
+    },
+    "ruptura_vendedor_mes": {
+      "linhas": 460,
+      "hash": "e83d3eb63517d969fba615a9d30fe20477c6a6b46bc4b9ecd6263018057d0385"
+    },
+    "base_clientes": {
+      "linhas": 560,
+      "hash": "046da82223bad385ca231f9c3e7353b552a8adcbe4fe6fa24dc8979ccebd86c6"
+    },
+    "fabricante_mensal": {
+      "linhas": 288,
+      "hash": "4ffd93730b2e1271dd0ddfe8717d5422847d1fc1430826f8c2814ed524a360f9"
+    },
+    "credito_clientes": {
+      "linhas": 517,
+      "hash": "0c7a0fad54f9abe74594513de2882089c2a17b41ae1c18c18953e246693a6b61"
+    },
+    "credito_cobranca": {
+      "linhas": 395,
+      "hash": "9f247001494f6f983fb42d794ce23bee38965205220b6eb0de21a7ac86776c25"
+    },
+    "credito_solicitacoes": {
+      "linhas": 90,
+      "hash": "e71226adaf792056a346aacc37735f47782f7bd1d038be3c2f89b035a9eed9ee"
+    },
+    "credito_historico": {
+      "linhas": 306,
+      "hash": "d19a3227a90294c3a14212c248030286e75952422726b81ba830b8ce1f28c367"
+    },
+    "credito_pedidos": {
+      "linhas": 3172,
+      "hash": "2f27fabc14a4a59d2f35f95fabca9529ca8dcb3a54fa18e9111bee9b766c47db"
+    },
+    "credito_alteracao": {
+      "linhas": 89,
+      "hash": "c58af497fb9672fa5561937d285d724595834174b1ee5c9c88d9aa4d8cc3070f"
+    }
+  }
+}

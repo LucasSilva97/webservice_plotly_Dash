@@ -24,6 +24,7 @@ fontes locais ──(Python)──▶ raw ──(dbt: staging ▶ intermediate �
   - [2. Abrir os painéis](#2-abrir-os-painéis) · [acesso pela rede](#acesso-pela-rede)
   - [3. Rodar os testes](#3-rodar-os-testes)
   - [Outras opções do ELT](#outras-opções-do-elt)
+- [Publicação online (Posit Connect Cloud)](#publicação-online-posit-connect-cloud)
 - [Arquitetura](#arquitetura)
   - [Por que DuckDB](#por-que-duckdb)
   - [Por que Parquet entre o banco e os painéis](#por-que-parquet-entre-o-banco-e-os-painéis)
@@ -56,10 +57,12 @@ fontes locais ──(Python)──▶ raw ──(dbt: staging ▶ intermediate �
 
 ```powershell
 py -3.12 -m venv .venv
-.venv\Scripts\python.exe -m pip install -r requirements.txt
+.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
 ```
 
-Em Linux ou macOS: `python3.12 -m venv .venv && .venv/bin/pip install -r requirements.txt`.
+Em Linux ou macOS: `python3.12 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt`.
+
+`requirements-dev.txt` instala o projeto inteiro: o `requirements.txt` (só os painéis, o que a [publicação online](#publicação-online-posit-connect-cloud) instala) mais o pipeline (DuckDB, dbt) e o pytest.
 
 ## Execução
 
@@ -114,6 +117,31 @@ Os testes dos painéis leem o que o último `elt` publicou. Os testes do pipelin
 | `python -m elt --manter-fontes --completo` | Igual ao anterior, recarregando o histórico inteiro. |
 | `python -m elt.gerar_fontes` | Só gera as fontes. |
 | `python -m elt.credito_implantacao [--executar]` | Implantação mensal de limite e prazo no ERP local; sem `--executar`, só simula. |
+
+## Publicação online (Posit Connect Cloud)
+
+Os painéis podem ser publicados direto do GitHub no [Posit Connect Cloud](https://connect.posit.cloud/). No plano gratuito, o repositório precisa ser público. A hospedagem só serve os painéis e não roda o ELT. Por isso `data/publicado/` e `data/snapshots/` (cerca de 1 MB) são versionados. Como o pipeline é determinístico, rodar o ELT de novo gera os mesmos bytes, e o git só acusa mudança quando o pipeline muda de fato.
+
+No formulário de publicação (**Publish › GitHub**):
+
+| Campo | Valor |
+|---|---|
+| Framework | **Dash** |
+| Repositório e branch | este repositório, `main` |
+| Primary file | `app.py` |
+| Advanced settings › Python version | **3.12**. O padrão é 3.11, e o `numpy` 2.5 exige 3.12. |
+
+- `app.py` expõe `app`, um objeto Dash. O servidor Flask desse objeto atende a página inicial e os três painéis.
+- `requirements.txt` tem só as dependências dos painéis, que é o que a hospedagem instala. O pipeline e os testes ficam em `requirements-dev.txt`.
+- Cada `git push` na `main` republica sozinho. Dá para desligar isso nas configurações do conteúdo.
+- Na versão online, a solicitação de crédito avisa que a publicação é só para consulta, porque o ERP local (`data/fontes/erp.sqlite`) não vai para o servidor.
+- Quando mudar uma regra no pipeline, rode o ELT e faça commit de `data/publicado/` e `data/snapshots/` junto com o código.
+
+Para testar localmente do mesmo jeito que a hospedagem carrega:
+
+```powershell
+.venv\Scripts\waitress-serve.exe --port 8050 app:app
+```
 
 ## Arquitetura
 
@@ -212,7 +240,7 @@ Os parâmetros ficam em `transform/dbt_project.yml`. Os cenários são criados p
 
 ## Ações que gravam dados (só no ambiente local)
 
-- **Solicitar alteração de limite ou prazo** (Crédito › Limite e prazo: clique num cliente e depois no botão). A solicitação é gravada em `data/fontes/erp.sqlite`, tabela `solicitacoes_credito`, com origem `painel` e situação "Em análise". Ela aparece na aba Solicitações depois de `python -m elt --manter-fontes`.
+- **Solicitar alteração de limite ou prazo** (Crédito › Limite e prazo: clique num cliente e depois no botão). A solicitação é gravada em `data/fontes/erp.sqlite`, tabela `solicitacoes_credito`, com origem `painel` e situação "Em análise". Ela aparece na aba Solicitações depois de `python -m elt --manter-fontes`. Na publicação online, o painel avisa que a gravação só funciona localmente.
 - **Implantação mensal de limite e prazo**: `python -m elt.credito_implantacao` mostra o que mudaria; `--executar` grava, no mesmo ERP local, o histórico e o novo limite e prazo de cada cliente. A gravação é uma transação por revenda. Há trava contra repetir a mesma data (`--repetir` refaz a implantação) e conferência de uma linha por `UPDATE`.
 
 Rodar `python -m elt` **sem** `--manter-fontes` recria as fontes do zero e descarta essas alterações. É a forma de voltar ao estado inicial da demonstração.
@@ -245,12 +273,16 @@ paineis/                três apps Dash num servidor (python -m paineis)
   estoque/ comercial/ credito/
   assets/               identidade visual (CSS, logotipo SVG, formatadores do AG Grid)
 tests/                  pytest
+app.py                  entrada para a hospedagem (Posit Connect Cloud): o objeto Dash `app`
+requirements.txt        dependências dos painéis (o que a hospedagem instala)
+requirements-dev.txt    projeto inteiro: painéis + pipeline + testes
 ```
 
-Pastas geradas e fora do versionamento: `data/` (fontes, banco, Parquet, snapshots), `logs/` e `transform/target/`.
+Pastas geradas e fora do versionamento: `data/fontes/` e `data/warehouse/` (fontes sintéticas e banco), `logs/` e `transform/target/`. A publicação (`data/publicado/` e `data/snapshots/`) também é gerada pelo ELT, mas é versionada para a [publicação online](#publicação-online-posit-connect-cloud).
 
 ## Limites conhecidos
 
 - A data de referência é fixa (18/11/2026), de propósito: é o que torna os resultados reproduzíveis. Para simular outro dia, mude `DATA_REFERENCIA` em `elt/config.py` e a variável `data_referencia` vem junto, porque o orquestrador a repassa ao dbt.
 - Os painéis não têm autenticação e o servidor escuta em `0.0.0.0`: qualquer pessoa na mesma rede abre os painéis e pode registrar solicitações de crédito no ERP local. Em rede que não seja de confiança, rode com `--host 127.0.0.1`.
+- A publicação online é aberta a quem tiver o link e é só de consulta: os dados são fictícios e nada é gravado no servidor.
 - A exportação gera Excel (`.xlsx`) com uma aba de filtros aplicados.

@@ -7,12 +7,20 @@ __pycache__/
 .ipynb_checkpoints/
 
 # Tudo o que o pipeline gera (fontes sintéticas, banco, parquet, snapshots)
-data/
+data/*
 logs/
 *.duckdb
 *.duckdb.wal
 *.sqlite
 *.parquet
+
+# ...menos a publicação que os painéis leem (~1 MB), versionada para a hospedagem (Posit Connect Cloud)
+# abrir os painéis sem rodar o ELT. Semente e data de referência são fixas: rodar o ELT de novo gera
+# os mesmos bytes, então o git só acusa mudança quando o pipeline muda de fato.
+!data/publicado/
+!data/publicado/*
+!data/snapshots/
+!data/snapshots/**
 
 # dbt
 transform/target/
