@@ -1,0 +1,147 @@
+version: 2
+
+# Cada mart vira data/publicado/<nome>.parquet. A descrição começa pelo grão (o que é uma linha).
+
+models:
+  # ---------------------------------------------------------------- Estoque
+  - name: estoque_reposicao
+    description: >
+      Grão: revenda x produto x período (MES_ATUAL, MES_ANTERIOR, ULTIMOS_30_DIAS) x base de
+      estoque (SISTEMA, CONTAGEM). Saldo, média de venda por dia útil, faixa mínimo/máximo,
+      quanto puxar ou reduzir (em caixas e em R$), dias de estoque com e sem trânsito.
+    data_tests:
+      - grao_unico: {arguments: {colunas: [revenda_id, produto_id, periodo, base_estoque]}}
+    columns:
+      - name: revenda_id
+        data_tests:
+          - not_null
+          - relationships: {arguments: {to: ref('stg_revendas'), field: revenda_id}}
+      - name: produto_id
+        data_tests:
+          - not_null
+          - relationships: {arguments: {to: ref('int_produtos_analise'), field: produto_id}}
+      - name: periodo
+        data_tests:
+          - accepted_values: {arguments: {values: ["MES_ATUAL", "MES_ANTERIOR", "ULTIMOS_30_DIAS"]}}
+      - name: base_estoque
+        data_tests:
+          - accepted_values: {arguments: {values: ["SISTEMA", "CONTAGEM"]}}
+      - name: custo_caixa
+        data_tests: [not_null]
+
+  - name: estoque_transito_notas
+    description: "Grão: documento (nota de compra ou de transferência) x produto, ainda sem entrada no destino."
+    data_tests:
+      - grao_unico: {arguments: {colunas: [revenda_id, produto_id, tipo, documento]}}
+
+  - name: estoque_transferencias_recebidas
+    description: "Grão: nota de transferência x produto que deu entrada depois da última compra da fábrica."
+    data_tests:
+      - grao_unico: {arguments: {colunas: [revenda_id, produto_id, nf_transferencia]}}
+
+  - name: sellin_sellout_mes
+    description: "Grão: revenda x produto x mês. Compras da fábrica (sell-in) e venda líquida (sell-out)."
+    data_tests:
+      - grao_unico: {arguments: {colunas: [revenda_id, produto_id, mes]}}
+
+  # ---------------------------------------------------------------- Comercial
+  - name: periodo_analise
+    description: "Grão: mês. Dias úteis do mês e decorridos até a data de referência."
+    columns:
+      - name: mes
+        data_tests: [unique, not_null]
+
+  - name: vendas_diarias
+    description: "Grão: revenda x data x vendedor (do pedido) x produto. Faturamento e volume líquidos."
+    data_tests:
+      - grao_unico: {arguments: {colunas: [revenda_id, data, vendedor_id, produto_id]}}
+    columns:
+      - name: canal
+        data_tests:
+          - accepted_values: {arguments: {values: ["IMEDIATO", "ABASTECIMENTO"]}}
+      - name: vendedor_id
+        data_tests:
+          - relationships: {arguments: {to: ref('stg_vendedores'), field: vendedor_id}}
+
+  - name: positivacao_cliente_mes
+    description: "Grão: revenda x mês x cliente x vendedor (do pedido) x canal do produto."
+    data_tests:
+      - grao_unico: {arguments: {colunas: [revenda_id, mes, cliente_id, vendedor_id, canal]}}
+    columns:
+      - name: cliente_id
+        data_tests:
+          - relationships: {arguments: {to: ref('stg_clientes'), field: cliente_id}}
+
+  - name: metas_mes
+    description: "Grão: revenda x mês x vendedor (0 = meta da revenda)."
+    data_tests:
+      - grao_unico: {arguments: {colunas: [revenda_id, mes, vendedor_id]}}
+
+  - name: ruptura_vendedor_mes
+    description: "Grão: revenda x mês x vendedor da carteira. Cobertura, ruptura, inadimplência e captação."
+    data_tests:
+      - grao_unico: {arguments: {colunas: [revenda_id, mes, vendedor_id]}}
+
+  - name: base_clientes
+    description: "Grão: cliente, na posição da data de referência (carteira analítica)."
+    columns:
+      - name: cliente_id
+        data_tests: [unique, not_null]
+      - name: situacao
+        data_tests:
+          - accepted_values: {arguments: {values: ["Ativo", "Inativo"]}}
+      - name: faixa_m0
+        data_tests:
+          - accepted_values: {arguments: {values: ["Sem compra", "Até R$ 300", "R$ 300 a 800", "R$ 800 a 2.000", "Acima de R$ 2.000"]}}
+
+  - name: fabricante_mensal
+    description: "Grão: revenda x mês x canal (IMEDIATO, ABASTECIMENTO, TODOS). Painel do fabricante do programa."
+    data_tests:
+      - grao_unico: {arguments: {colunas: [revenda_id, mes, canal]}}
+
+  # ---------------------------------------------------------------- Crédito
+  - name: credito_clientes
+    description: "Grão: cliente ativo. Limite atual e sugerido, prazo atual e sugerido, posição financeira."
+    columns:
+      - name: cliente_id
+        data_tests:
+          - unique
+          - not_null
+          - relationships: {arguments: {to: ref('stg_clientes'), field: cliente_id}}
+      - name: classificacao
+        data_tests:
+          - accepted_values: {arguments: {values: ["A", "B", "C", "D"]}}
+
+  - name: credito_cobranca
+    description: "Grão: título em aberto na data de referência."
+    columns:
+      - name: titulo_id
+        data_tests: [unique, not_null]
+
+  - name: credito_solicitacoes
+    description: "Grão: solicitação de alteração de limite e/ou prazo."
+    columns:
+      - name: solicitacao_id
+        data_tests: [unique, not_null]
+      - name: situacao
+        data_tests:
+          - accepted_values: {arguments: {values: ["Em análise", "Aprovada", "Reprovada"]}}
+
+  - name: credito_historico
+    description: "Grão: cliente x data de implantação."
+    data_tests:
+      - grao_unico: {arguments: {colunas: [cliente_id, data_implantacao]}}
+
+  - name: credito_pedidos
+    description: "Grão: pedido emitido na janela de credito_janela_dias dias."
+    columns:
+      - name: pedido_id
+        data_tests: [unique, not_null]
+
+  - name: credito_alteracao
+    description: "Grão: cliente a prazo com mudança proposta para a próxima implantação."
+    columns:
+      - name: cliente_id
+        data_tests: [unique, not_null]
+      - name: condicao_nova_id
+        data_tests: [not_null]

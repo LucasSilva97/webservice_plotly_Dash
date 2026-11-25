@@ -1,0 +1,49 @@
+name: distribuidora
+version: "1.0.0"
+config-version: 2
+profile: distribuidora
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+# Parâmetros das regras de negócio (todos inventados para a demonstração).
+# O orquestrador (python -m elt) repassa a data_referencia de elt/config.py.
+vars:
+  data_referencia: "2026-11-18"
+  # Estoque
+  dias_estoque_minimo: 8          # estoque mínimo = média diária x 8 dias úteis
+  dias_estoque_maximo: 14         # estoque máximo = média diária x 14 dias úteis
+  dias_compra_antiga: 45          # última compra há mais de 45 dias fica destacada
+  # Comercial
+  fabricante_programa: "Fábrica Horizonte"
+  dias_tolerancia_inadimplencia: 7  # título vencido há mais de 7 dias torna o cliente inadimplente
+  # Crédito
+  credito_dias_debito_avista: 35  # título vencido há 35+ dias leva o cliente para à vista
+  credito_media_atraso_reducao: 6 # média de atraso >= 6 dias reduz o prazo um degrau
+  credito_janela_dias: 90         # janela da média de atraso e do faturamento médio
+  credito_juros_dia: 0.0025       # juros simples por dia de atraso na cobrança
+  credito_acrescimo_classificacao: {"A": 1.0, "B": 0.8, "C": 0.6, "D": 0.4}
+  escada_limite: [1500, 3000, 6000, 12000, 25000, 50000, 80000, 120000, 180000]
+  credito_dia_implantacao: 5      # implantação mensal de limite e prazo no dia 5
+
+models:
+  distribuidora:
+    staging:
+      +materialized: view
+      +schema: staging
+    intermediate:
+      +materialized: table
+      +schema: intermediate
+    marts:
+      +materialized: table
+      +schema: marts
+
+seeds:
+  distribuidora:
+    +schema: seeds
+    feriados:
+      +column_types: {data: date, descricao: varchar}

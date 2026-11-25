@@ -1,0 +1,58 @@
+version: 2
+
+sources:
+  - name: raw
+    description: "Cópia fiel das fontes locais (ERP fictício em SQLite e planilha de metas), carregada por elt/ingestao.py."
+    schema: raw
+    tables:
+      - name: revendas
+      - name: vendedores
+      - name: clientes
+      - name: clientes_vendedor_hist
+      - name: condicoes_pagamento
+      - name: produtos
+      - name: tabela_custos
+      - name: pedidos
+        description: "Capa dos pedidos. Carga por janela de meses (data_emissao)."
+      - name: pedido_itens
+        description: "Itens dos pedidos, com a data_emissao da capa para o corte da janela."
+      - name: devolucoes
+      - name: titulos_receber
+      - name: compras_itens
+      - name: transferencias
+      - name: estoque_saldos
+      - name: contagens_estoque
+      - name: equipamentos_cedidos
+      - name: solicitacoes_credito
+      - name: historico_implantacoes
+      - name: metas_comerciais
+        description: "Planilha de metas em texto pt-BR, com linhas de AJUSTE assinadas."
+
+models:
+  - name: stg_pedido_itens
+    description: "Um item de pedido por linha (todos os status; o filtro de faturado fica no intermediate)."
+    data_tests:
+      - grao_unico: {arguments: {colunas: [pedido_id, item]}}
+  - name: stg_pedidos
+    columns:
+      - name: pedido_id
+        data_tests: [unique, not_null]
+      - name: status
+        data_tests:
+          - accepted_values: {arguments: {values: ["FATURADO", "CANCELADO", "BLOQUEADO"]}}
+  - name: stg_clientes
+    columns:
+      - name: cliente_id
+        data_tests: [unique, not_null]
+      - name: revenda_id
+        data_tests:
+          - relationships: {arguments: {to: ref('stg_revendas'), field: revenda_id}}
+  - name: stg_produtos
+    columns:
+      - name: produto_id
+        data_tests: [unique, not_null]
+  - name: stg_metas_comerciais
+    columns:
+      - name: valor
+        description: "Número convertido do texto pt-BR. Nulo aqui é erro de conversão."
+        data_tests: [not_null]

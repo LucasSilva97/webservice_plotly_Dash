@@ -1,0 +1,8 @@
+distribuidora:
+  target: local
+  outputs:
+    local:
+      type: duckdb
+      # O orquestrador define DBT_DUCKDB_PATH com o caminho absoluto do banco.
+      path: "{{ env_var('DBT_DUCKDB_PATH', '../data/warehouse/distribuidora.duckdb') }}"
+      threads: 4

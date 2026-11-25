@@ -1,0 +1,38 @@
+# Ambiente e caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Tudo o que o pipeline gera (fontes sintéticas, banco, parquet, snapshots)
+data/
+logs/
+*.duckdb
+*.duckdb.wal
+*.sqlite
+*.parquet
+
+# dbt
+transform/target/
+transform/dbt_packages/
+transform/logs/
+transform/.user.yml
+
+# Segredos e configuração local (o projeto não precisa de nenhum)
+.env
+.env.*
+*.pem
+*.key
+.vscode/
+.idea/
+
+# Saídas de exportação e capturas feitas durante testes manuais
+*.xlsx
+*.png
+!paineis/assets/*.png
+
+# Sistema
+.DS_Store
+Thumbs.db

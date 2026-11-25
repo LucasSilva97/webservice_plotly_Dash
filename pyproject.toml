@@ -1,0 +1,10 @@
+[project]
+name = "portfolio-elt-distribuicao"
+version = "1.0.0"
+description = "Demonstração de ELT (Python + dbt/DuckDB + Parquet) e painéis Dash para uma distribuidora fictícia"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = ["ignore::DeprecationWarning"]
