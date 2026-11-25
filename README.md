@@ -14,6 +14,27 @@ fontes locais ──(Python)──▶ raw ──(dbt: staging ▶ intermediate �
 | **Comercial** | Diário de vendas com tendência e meta, metas por vendedor, carteira de clientes com filtros cruzados, ruptura de cobertura e o painel de um fabricante parceiro. |
 | **Crédito e Prazo** | Consulta de limite e prazo, cobrança, solicitações, histórico das implantações e pedidos do cliente. A solicitação de alteração grava só no ambiente local. |
 
+## Sumário
+
+- [O que o projeto demonstra](#o-que-o-projeto-demonstra)
+- [Pré-requisitos](#pré-requisitos)
+- [Instalação](#instalação)
+- [Execução](#execução)
+  - [1. Gerar os dados e rodar o ELT](#1-gerar-os-dados-e-rodar-o-elt)
+  - [2. Abrir os painéis](#2-abrir-os-painéis) · [acesso pela rede](#acesso-pela-rede)
+  - [3. Rodar os testes](#3-rodar-os-testes)
+  - [Outras opções do ELT](#outras-opções-do-elt)
+- [Arquitetura](#arquitetura)
+  - [Por que DuckDB](#por-que-duckdb)
+  - [Por que Parquet entre o banco e os painéis](#por-que-parquet-entre-o-banco-e-os-painéis)
+  - [Camadas](#camadas)
+- [Das fontes a cada painel](#das-fontes-a-cada-painel)
+- [Regras fictícias e onde vê-las na tela](#regras-fictícias-e-onde-vê-las-na-tela)
+- [Ações que gravam dados](#ações-que-gravam-dados-só-no-ambiente-local)
+- [Reexecução e idempotência](#reexecução-e-idempotência)
+- [Estrutura](#estrutura)
+- [Limites conhecidos](#limites-conhecidos)
+
 ## O que o projeto demonstra
 
 - **ELT em camadas, com papéis separados.** A ingestão em Python só copia as fontes para `raw`, sem regra de negócio. Toda regra fica no dbt: `staging` limpa e tipa, `intermediate` aplica as regras reutilizáveis, `marts` entrega uma tabela por necessidade de tela. Cada mart tem o grão documentado.
@@ -42,7 +63,9 @@ Em Linux ou macOS: `python3.12 -m venv .venv && .venv/bin/pip install -r require
 
 ## Execução
 
-**1. Gerar os dados e rodar o ELT completo** (cerca de 1 minuto):
+### 1. Gerar os dados e rodar o ELT
+
+O ELT completo leva cerca de 1 minuto:
 
 ```powershell
 elt.bat                      # ou: .venv\Scripts\python.exe -m elt
@@ -56,13 +79,15 @@ O comando faz, em ordem:
 4. publica os Parquet em `data/publicado/`;
 5. grava o snapshot do estoque.
 
-**2. Abrir os painéis:**
+### 2. Abrir os painéis
 
 ```powershell
 paineis.bat                  # ou: .venv\Scripts\python.exe -m paineis --abrir
 ```
 
 Os painéis ficam em <http://127.0.0.1:8050/>, com a página inicial e os três painéis em `/estoque/`, `/comercial/` e `/credito/`. `Ctrl+C` encerra.
+
+#### Acesso pela rede
 
 O servidor (waitress) escuta em `0.0.0.0`, então outras pessoas na mesma rede abrem os painéis pelo IP desta máquina. Ao subir, ele mostra o link certo (`na rede: http://192.168.x.y:8050/`). Para deixar só nesta máquina: `paineis.bat --host 127.0.0.1`.
 
@@ -72,7 +97,7 @@ Se ninguém mais consegue abrir o link:
 - a rede do notebook precisa estar como **Privada** (Configurações › Rede e Internet › propriedades da conexão), porque em rede Pública o firewall bloqueia;
 - se a pergunta foi recusada, libere a porta num PowerShell como administrador: `netsh advfirewall firewall add rule name="Paineis 8050" dir=in action=allow protocol=TCP localport=8050 profile=private`.
 
-**3. Rodar os testes:**
+### 3. Rodar os testes
 
 ```powershell
 .venv\Scripts\python.exe -m pytest                # tudo (cerca de 4 minutos; inclui 3 execuções completas do ELT)
@@ -81,7 +106,7 @@ Se ninguém mais consegue abrir o link:
 
 Os testes dos painéis leem o que o último `elt` publicou. Os testes do pipeline rodam em pastas temporárias e não tocam em `data/`.
 
-Outras opções do ELT:
+### Outras opções do ELT
 
 | Comando | Efeito |
 |---|---|
@@ -119,11 +144,15 @@ flowchart LR
     K -. solicitação .-> ERP
 ```
 
-**Por que DuckDB.** O dbt precisa de um banco, e o DuckDB roda dentro do processo Python, num arquivo só (`data/warehouse/distribuidora.duckdb`), sem servidor nem credencial. O adaptador `dbt-duckdb` aceita o SQL analítico usado nos modelos: CTEs, `qualify`, `filter`, janelas e `generate_series`. A troca por um Postgres de produção mudaria o `profiles.yml` e poucas funções de data.
+### Por que DuckDB
 
-**Por que Parquet entre o banco e os painéis.** O painel não precisa de conexão nem de credencial. O arquivo é pequeno, preserva os tipos e é lido por inteiro a cada interação, então a tela pega sozinha a publicação nova. O DuckDB aceita um só processo gravando, e assim o ELT pode rodar com os painéis abertos.
+O dbt precisa de um banco, e o DuckDB roda dentro do processo Python, num arquivo só (`data/warehouse/distribuidora.duckdb`), sem servidor nem credencial. O adaptador `dbt-duckdb` aceita o SQL analítico usado nos modelos: CTEs, `qualify`, `filter`, janelas e `generate_series`. A troca por um Postgres de produção mudaria o `profiles.yml` e poucas funções de data.
 
-**Camadas:**
+### Por que Parquet entre o banco e os painéis
+
+O painel não precisa de conexão nem de credencial. O arquivo é pequeno, preserva os tipos e é lido por inteiro a cada interação, então a tela pega sozinha a publicação nova. O DuckDB aceita um só processo gravando, e assim o ELT pode rodar com os painéis abertos.
+
+### Camadas
 
 | Camada | Materialização | Papel |
 |---|---|---|
