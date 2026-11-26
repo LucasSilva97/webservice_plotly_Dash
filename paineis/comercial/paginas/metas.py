@@ -2,13 +2,12 @@
 from datetime import date
 
 import pandas as pd
-import plotly.graph_objects as go
 from dash import Input, Output, State, dcc, html
 
 from paineis.comercial import dados
 from paineis.comercial.paginas.diario import ESTILO_ATING, tom_atingimento
 from paineis.comum import componentes as c
-from paineis.comum import exportar, formatos
+from paineis.comum import exportar, formatos, graficos
 from paineis.comum.dados import ler_parquet, para_grade
 
 COLUNAS = [
@@ -37,7 +36,7 @@ def layout():
         ]),
         html.Div(id="cm-m-cards", className="cards"),
         html.Section(className="secao", children=[html.H2("Meta x tendência por vendedor"),
-                                                  dcc.Graph(id="cm-m-grafico", config={"displayModeBar": False})]),
+                                                  graficos.grafico("cm-m-grafico", 280)]),
         html.Section(className="secao", children=[
             html.Div(className="barra-tabela", children=[
                 html.H2("Metas do mês"),
@@ -51,9 +50,26 @@ def layout():
     ])
 
 
+def grafico_metas(linhas):
+    """Meta contra tendência, lado a lado, por vendedor."""
+    return graficos.opcao(
+        grid={"left": 8, "right": 16, "top": 16, "bottom": 36, "containLabel": True},
+        tooltip={**graficos.TOOLTIP_EIXO, "valueFormatter": "fn:moeda"},
+        legend=graficos.LEGENDA,
+        xAxis=graficos.eixo_categoria(linhas["vendedor"] if len(linhas) else []),
+        yAxis=graficos.eixo_valor("moedaCurta"),
+        series=[
+            graficos.barras("meta", "Meta", graficos.valores(linhas["meta"]) if len(linhas) else [], graficos.CINZA),
+            graficos.barras("tendencia", "Tendência", graficos.valores(linhas["tendencia"]) if len(linhas) else [], graficos.AZUL),
+        ],
+    )
+
+
 def registrar(app):
+    graficos.registrar(app, "cm-m-grafico")
+
     @app.callback(
-        Output("cm-m-cards", "children"), Output("cm-m-grafico", "figure"), Output("cm-m-grade", "rowData"),
+        Output("cm-m-cards", "children"), Output("cm-m-grafico", "data"), Output("cm-m-grade", "rowData"),
         Output("cm-m-grade", "dashGridOptions"), Output("cm-m-nota", "children"),
         Input("cm-revenda", "value"), Input("cm-m-mes", "value"),
     )
@@ -68,19 +84,13 @@ def registrar(app):
             c.card("Clientes positivados", formatos.numero(total["positivados"]),
                    f"{formatos.pct(total['ating_clientes'])} de {formatos.numero(total['meta_clientes'])}", tom_atingimento(total["ating_clientes"])),
         ]
-        figura = go.Figure()
-        if len(linhas):
-            figura.add_bar(x=linhas["vendedor"], y=linhas["meta"], name="Meta", marker_color="#c9d3d8")
-            figura.add_bar(x=linhas["vendedor"], y=linhas["tendencia"], name="Tendência", marker_color="#0e4d64")
-        figura.update_layout(height=280, barmode="group", margin={"l": 10, "r": 10, "t": 10, "b": 10}, separators=",.",
-                             yaxis_tickprefix="R$ ", legend={"orientation": "h", "y": -0.2}, plot_bgcolor="#fff")
         if 0 < dias["decorridos"] < dias["uteis"]:
             nota = f"Mês em andamento: {dias['decorridos']} de {dias['uteis']} dias úteis; tendência projetada."
         elif dias["decorridos"] == 0:
             nota = "Mês futuro: só a meta."
         else:
             nota = "Mês fechado: tendência = realizado."
-        return cards, figura, para_grade(linhas), {"pinnedTopRowData": para_grade(pd.DataFrame([total]))}, nota
+        return cards, grafico_metas(linhas), para_grade(linhas), {"pinnedTopRowData": para_grade(pd.DataFrame([total]))}, nota
 
     @app.callback(
         Output("cm-m-download", "data"), Input("cm-m-exportar", "n_clicks"),

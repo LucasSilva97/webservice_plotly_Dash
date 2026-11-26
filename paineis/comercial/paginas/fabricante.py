@@ -1,11 +1,11 @@
 """Painel do fabricante parceiro: caixas, clientes com compra e ruptura, mês a mês,
 ano corrente x ano anterior x meta do programa."""
-import plotly.graph_objects as go
 from dash import Input, Output, dcc, html
 
 from paineis.comercial import dados
-from paineis.comum import formatos
+from paineis.comum import formatos, graficos
 
+SPARKLINES = ("cm-f-spark-caixas", "cm-f-spark-clientes", "cm-f-spark-ruptura")
 CANAIS = [{"label": "Todos", "value": "TODOS"}] + [{"label": v, "value": k} for k, v in dados.CANAIS.items()]
 
 
@@ -21,14 +21,23 @@ def layout():
     ])
 
 
-def _sparkline(atual, anterior):
-    meses = formatos.MESES
-    figura = go.Figure()
-    figura.add_scatter(x=meses, y=anterior, name="ano anterior", line={"color": "#9aa8ae", "dash": "dash"})
-    figura.add_scatter(x=meses, y=atual, name="ano atual", line={"color": "#0e4d64", "width": 3}, fill="tozeroy", fillcolor="rgba(14,77,100,0.08)")
-    figura.update_layout(height=110, margin={"l": 0, "r": 0, "t": 4, "b": 0}, showlegend=False, xaxis_visible=False,
-                         yaxis_visible=False, plot_bgcolor="#fff", separators=",.")
-    return dcc.Graph(figure=figura, config={"displayModeBar": False})
+def _sparkline(id, atual, anterior, formato):
+    """Linha do ano atual (com área) sobre a do ano anterior, sem eixos; o mês aparece no tooltip."""
+    linha = {"type": "line", "symbol": "circle", "symbolSize": 5, "showSymbol": False}
+    opcao = graficos.opcao(
+        grid={"left": 2, "right": 2, "top": 6, "bottom": 2},
+        tooltip={**graficos.TOOLTIP_EIXO, "axisPointer": {"type": "line"}, "valueFormatter": f"fn:{formato}"},
+        xAxis={"type": "category", "data": formatos.MESES, "show": False, "boundaryGap": False},
+        yAxis={"type": "value", "show": False, "scale": True},
+        series=[
+            {**linha, "id": "anterior", "name": "ano anterior", "data": graficos.valores(anterior),
+             "lineStyle": {"color": graficos.CINZA_LINHA, "type": "dashed", "width": 2}, "itemStyle": {"color": graficos.CINZA_LINHA}},
+            {**linha, "id": "atual", "name": "ano atual", "data": graficos.valores(atual),
+             "lineStyle": {"color": graficos.AZUL, "width": 3}, "itemStyle": {"color": graficos.AZUL},
+             "areaStyle": {"color": "rgba(14,77,100,0.08)"}},
+        ],
+    )
+    return graficos.grafico(id, 110, opcao)
 
 
 def _celula(valor, tipo="numero", destaque=False):
@@ -58,18 +67,20 @@ def _tabela(linhas, com_total=True):
     return html.Div(className="rolagem", children=html.Table([html.Thead(cabecalho), html.Tbody(corpo)], className="tabela-simples"))
 
 
-def _bloco(selo, titulo, subtitulo, atual, anterior, tabela):
+def _bloco(selo, titulo, subtitulo, sparkline, tabela):
     return html.Div(className="bloco-fabricante", children=[
         html.Div([
             html.Div(className="bloco-titulo", children=[html.Span(selo, className="selo"),
                                                        html.Div([html.H2(titulo), html.Span(subtitulo, className="nota")])]),
-            _sparkline(atual, anterior),
+            sparkline,
         ]),
         tabela,
     ])
 
 
 def registrar(app):
+    graficos.registrar(app, *SPARKLINES)
+
     @app.callback(Output("cm-f-blocos", "children"), Input("cm-revenda", "value"), Input("cm-f-canal", "value"))
     def atualizar(revenda, canal):
         f = dados.fabricante(revenda, canal)
@@ -95,7 +106,7 @@ def registrar(app):
             ("Meta", rp["meta"], "pct_simples", False, None),
         ], com_total=False)
         return [
-            _bloco("CX", "Caixas", "volume líquido dos produtos do fabricante", cx["atual"], cx["anterior"], caixas),
-            _bloco("CL", "Clientes com compra", "Total = clientes distintos no ano até o último mês com venda", cl["atual"], cl["anterior"], clientes),
-            _bloco("RP", "Ruptura da carteira", "% de clientes ativos sem compra (quanto menor, melhor)", rp["atual"], rp["anterior"], ruptura),
+            _bloco("CX", "Caixas", "volume líquido dos produtos do fabricante", _sparkline(SPARKLINES[0], cx["atual"], cx["anterior"], "inteiro"), caixas),
+            _bloco("CL", "Clientes com compra", "Total = clientes distintos no ano até o último mês com venda", _sparkline(SPARKLINES[1], cl["atual"], cl["anterior"], "inteiro"), clientes),
+            _bloco("RP", "Ruptura da carteira", "% de clientes ativos sem compra (quanto menor, melhor)", _sparkline(SPARKLINES[2], rp["atual"], rp["anterior"], "pct"), ruptura),
         ]

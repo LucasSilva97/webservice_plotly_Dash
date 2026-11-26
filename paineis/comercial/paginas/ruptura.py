@@ -1,13 +1,13 @@
 """Página Ruptura: cobertura da carteira (clientes ativos que compraram no mês) por vendedor."""
+import math
 from datetime import date
 
 import pandas as pd
-import plotly.graph_objects as go
 from dash import Input, Output, State, dcc, html
 
 from paineis.comercial import dados
 from paineis.comum import componentes as c
-from paineis.comum import exportar, formatos
+from paineis.comum import exportar, formatos, graficos
 from paineis.comum.dados import ler_parquet, para_grade
 
 FAIXAS_RUPTURA = [(40, "#c0392b", "crítica"), (30, "#e67e22", "alta"), (20, "#f2a93b", "média"), (0, "#2e8b57", "baixa")]
@@ -54,8 +54,8 @@ def layout():
         ]),
         html.Div(className="graficos", children=[
             html.Section(className="secao", children=[html.H2("Cobertura da carteira"), html.Div(id="cm-r-resumo")]),
-            html.Section(className="secao", children=[html.H2("Evolução da cobertura"), dcc.Graph(id="cm-r-cobertura", config={"displayModeBar": False})]),
-            html.Section(className="secao", children=[html.H2("Evolução da ruptura"), dcc.Graph(id="cm-r-ruptura", config={"displayModeBar": False})]),
+            html.Section(className="secao", children=[html.H2("Evolução da cobertura"), graficos.grafico("cm-r-cobertura", 230)]),
+            html.Section(className="secao", children=[html.H2("Evolução da ruptura"), graficos.grafico("cm-r-ruptura", 230)]),
         ]),
         html.Section(className="secao", children=[
             html.Div(className="barra-tabela", children=[
@@ -70,15 +70,37 @@ def layout():
 
 
 def _barras(evolucao, coluna, cores):
-    rotulos = [formatos.mes_rotulo(int(m)) for m in evolucao["mes"]]
-    figura = go.Figure(go.Bar(x=rotulos, y=evolucao[coluna], marker_color=cores,
-                              text=[formatos.pct(v, 0) for v in evolucao[coluna]], textposition="outside"))
-    figura.update_layout(height=230, margin={"l": 10, "r": 10, "t": 10, "b": 10}, yaxis_visible=False,
-                         yaxis_range=[0, max(evolucao[coluna].max() * 1.3, 10)], plot_bgcolor="#fff")
-    return figura
+    """Uma barra por mês, cada uma com a própria cor e o percentual em cima."""
+    valores = graficos.valores(evolucao[coluna])
+    maximo = max([v for v in valores if v is not None] + [0])
+    return graficos.opcao(
+        grid={"left": 4, "right": 4, "top": 22, "bottom": 4, "containLabel": True},
+        tooltip={**graficos.TOOLTIP_EIXO, "valueFormatter": "fn:pct"},
+        xAxis=graficos.eixo_categoria([formatos.mes_rotulo(int(m)) for m in evolucao["mes"]]),
+        yAxis={"type": "value", "show": False, "axisLabel": {"show": False}, "min": 0, "max": math.ceil(max(maximo * 1.3, 10))},
+        series=[graficos.barras(coluna, "", [{"value": v, "itemStyle": {"color": cor}} for v, cor in zip(valores, cores)],
+                                label={"show": True, "position": "top", "formatter": "fn:pct0", "fontSize": 11,
+                                       "color": graficos.CINZA_ESCURO})],
+    )
+
+
+def _rosca(total):
+    """Com compra x sem compra, com a cobertura no meio."""
+    return graficos.opcao(
+        tooltip={"trigger": "item", "confine": True, "valueFormatter": "fn:inteiro"},
+        title={"text": formatos.pct(total["perc_cobertura"]), "left": "center", "top": "center",
+               "textStyle": {"fontSize": 20, "fontWeight": 600, "color": graficos.TEXTO}},
+        series=[{"id": "rosca", "type": "pie", "radius": ["62%", "92%"], "center": ["50%", "50%"], "label": {"show": False},
+                 "itemStyle": {"borderColor": "#fff", "borderWidth": 2}, "animationType": "expansion",
+                 "emphasis": {"scale": True, "scaleSize": 4},
+                 "data": [{"name": "Com compra", "value": float(total["clientes_cobertos"]), "itemStyle": {"color": graficos.AZUL}},
+                          {"name": "Sem compra", "value": float(total["clientes_sem_compra"]), "itemStyle": {"color": graficos.AMBAR}}]}],
+    )
 
 
 def registrar(app):
+    graficos.registrar(app, "cm-r-rosca", "cm-r-cobertura", "cm-r-ruptura")
+
     @app.callback(Output("cm-r-vendedor", "options"), Input("cm-revenda", "value"))
     def vendedores(revenda):
         df = ler_parquet("ruptura_vendedor_mes")
@@ -86,20 +108,16 @@ def registrar(app):
         return [{"label": v.vendedor, "value": v.vendedor_id} for v in nomes.itertuples()]
 
     @app.callback(
-        Output("cm-r-resumo", "children"), Output("cm-r-cobertura", "figure"), Output("cm-r-ruptura", "figure"),
+        Output("cm-r-resumo", "children"), Output("cm-r-cobertura", "data"), Output("cm-r-ruptura", "data"),
         Output("cm-r-grade", "rowData"), Output("cm-r-grade", "dashGridOptions"), Output("cm-r-titulo", "children"),
         Input("cm-revenda", "value"), Input("cm-r-mes", "value"), Input("cm-r-vendedor", "value"),
     )
     def atualizar(revenda, mes, vendedor):
         do_mes, total, evolucao, variacao = dados.ruptura(revenda, mes, vendedor)
         evolucao = evolucao.tail(13)
-        rosca = go.Figure(go.Pie(values=[total["clientes_cobertos"], total["clientes_sem_compra"]], labels=["Com compra", "Sem compra"],
-                                 hole=0.62, marker_colors=["#0e4d64", "#f2a93b"], sort=False, textinfo="none"))
-        rosca.update_layout(height=180, margin={"l": 0, "r": 0, "t": 0, "b": 0}, showlegend=False,
-                            annotations=[{"text": formatos.pct(total["perc_cobertura"]), "showarrow": False, "font": {"size": 20}}])
         chip = "Sem comparativo" if variacao is None else f"{'▲' if variacao >= 0 else '▼'} {formatos.numero(abs(variacao), 1)} p.p. vs mês anterior"
         resumo = html.Div(style={"display": "grid", "gridTemplateColumns": "1fr 1fr", "alignItems": "center"}, children=[
-            dcc.Graph(figure=rosca, config={"displayModeBar": False}),
+            graficos.grafico("cm-r-rosca", 180, _rosca(total)),
             html.Div([
                 html.P(["Clientes ativos: ", html.Strong(formatos.numero(total["clientes_ativos"]))]),
                 html.P(["Com compra: ", html.Strong(formatos.numero(total["clientes_cobertos"]))]),

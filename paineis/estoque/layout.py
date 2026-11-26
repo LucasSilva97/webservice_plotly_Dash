@@ -2,6 +2,7 @@
 from dash import dcc, html
 
 from paineis.comum import componentes as c
+from paineis.comum import graficos
 from paineis.comum.dados import data_geracao, data_referencia, opcoes
 from paineis.estoque import dados
 
@@ -49,10 +50,6 @@ COLUNAS_RECEBIDAS = [
 ]
 
 
-def _gauge(id):
-    return dcc.Graph(id=id, config={"displayModeBar": False}, style={"height": "190px"})
-
-
 def montar_layout():
     df = dados.carregar()
     revendas = df[["revenda_id", "revenda"]].drop_duplicates().sort_values("revenda_id")
@@ -77,9 +74,9 @@ def montar_layout():
     indicadores = html.Section(children=[
         html.Div(id="ep-cards", className="cards"),
         html.Div(className="graficos", style={"marginTop": "12px"}, children=[
-            html.Div(className="secao", children=[html.H2("Sell-in / sell-out (HL)"), _gauge("ep-gauge-sellin")]),
-            html.Div(className="secao", children=[html.H2(f"Dias de estoque · {dados.MARCA_PRINCIPAL}"), _gauge("ep-gauge-marca")]),
-            html.Div(className="secao", children=[html.H2("Dias de estoque · geral"), _gauge("ep-gauge-geral")]),
+            html.Div(className="secao", children=[html.H2("Sell-in / sell-out (HL)"), graficos.grafico("ep-gauge-sellin", 190)]),
+            html.Div(className="secao", children=[html.H2(f"Dias de estoque · {dados.MARCA_PRINCIPAL}"), graficos.grafico("ep-gauge-marca", 190)]),
+            html.Div(className="secao", children=[html.H2("Dias de estoque · geral"), graficos.grafico("ep-gauge-geral", 190)]),
         ]),
     ])
 

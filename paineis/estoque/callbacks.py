@@ -2,11 +2,10 @@
 sozinha a publicação nova, e não há DataFrame guardado no navegador."""
 from datetime import date
 
-import plotly.graph_objects as go
 from dash import Input, Output, State, ctx, dcc, html, no_update
 
 from paineis.comum import componentes as c
-from paineis.comum import exportar, formatos
+from paineis.comum import exportar, formatos, graficos
 from paineis.comum.dados import ler_parquet, para_grade
 from paineis.estoque import dados
 
@@ -14,17 +13,7 @@ FILTROS = [Input("ep-revenda", "value"), Input("ep-periodo", "value"), Input("ep
            Input("ep-marca", "value"), Input("ep-categoria", "value"), Input("ep-produto", "value"),
            Input("ep-acao", "value")]
 ESTADO_FILTROS = [State(i.component_id, i.component_property) for i in FILTROS]
-
-
-def gauge(valor, maximo, faixa_verde, sufixo=""):
-    figura = go.Figure(go.Indicator(
-        mode="gauge+number", value=valor if valor is not None else 0,
-        number={"suffix": sufixo, "valueformat": ".1f", "font": {"size": 34}},
-        gauge={"axis": {"range": [0, maximo]}, "bar": {"color": "#0e4d64"},
-               "steps": [{"range": list(faixa_verde), "color": "#cfe8d8"}]},
-    ))
-    figura.update_layout(margin={"l": 25, "r": 25, "t": 10, "b": 5}, height=180, separators=",.")
-    return figura
+GAUGES = ("ep-gauge-sellin", "ep-gauge-marca", "ep-gauge-geral")
 
 
 def montar_cards(i):
@@ -44,9 +33,11 @@ def descrever_filtros(revenda, periodo, base, marcas, categorias, produtos, acao
 
 
 def registrar(app):
+    graficos.registrar(app, *GAUGES)
+
     @app.callback(
-        Output("ep-cards", "children"), Output("ep-gauge-sellin", "figure"), Output("ep-gauge-marca", "figure"),
-        Output("ep-gauge-geral", "figure"), Output("ep-grade", "rowData"), Output("ep-contagem", "children"),
+        Output("ep-cards", "children"), Output("ep-gauge-sellin", "data"), Output("ep-gauge-marca", "data"),
+        Output("ep-gauge-geral", "data"), Output("ep-grade", "rowData"), Output("ep-contagem", "children"),
         *FILTROS,
     )
     def atualizar(revenda, periodo, base, marcas, categorias, produtos, acao):
@@ -57,9 +48,9 @@ def registrar(app):
         texto += f" · {len(df)} produtos"
         return (
             montar_cards(i),
-            gauge(i["sellin_pct"], 200, (90, 110), "%"),
-            gauge(i["dde_marca"], 30, dados.FAIXA_DDE),
-            gauge(i["dde_geral"], 30, dados.FAIXA_DDE),
+            graficos.gauge(i["sellin_pct"], 200, (90, 110), "pct"),
+            graficos.gauge(i["dde_marca"], 30, dados.FAIXA_DDE, divisoes=3),
+            graficos.gauge(i["dde_geral"], 30, dados.FAIXA_DDE, divisoes=3),
             para_grade(df),
             texto,
         )

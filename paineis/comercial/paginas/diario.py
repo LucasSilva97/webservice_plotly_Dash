@@ -1,12 +1,11 @@
 """Página Diário de Vendas: realizado do mês corrente, tendência e meta."""
 from datetime import date
 
-import plotly.graph_objects as go
 from dash import Input, Output, State, dcc, html
 
 from paineis.comercial import dados
 from paineis.comum import componentes as c
-from paineis.comum import exportar, formatos
+from paineis.comum import exportar, formatos, graficos
 from paineis.comum.dados import ler_parquet, opcoes, para_grade
 
 ESTILO_ATING = {"styleConditions": [
@@ -42,9 +41,9 @@ def layout():
         ]),
         html.Div(id="cm-d-cards", className="cards"),
         html.Div(className="graficos", children=[
-            html.Section(className="secao", children=[html.H2("Ritmo do mês"), dcc.Graph(id="cm-d-ritmo", config={"displayModeBar": False})]),
+            html.Section(className="secao", children=[html.H2("Ritmo do mês"), graficos.grafico("cm-d-ritmo", 300)]),
             html.Section(className="secao", children=[html.H2("Realizado por marca x ano anterior (até a mesma data)"),
-                                                      dcc.Graph(id="cm-d-marcas", config={"displayModeBar": False})]),
+                                                      graficos.grafico("cm-d-marcas", 300)]),
         ]),
         html.Section(className="secao", children=[
             html.Div(className="barra-tabela", children=[
@@ -60,32 +59,55 @@ def layout():
 
 
 def grafico_ritmo(kpis, por_dia):
+    """Realizado acumulado por dia útil contra a reta da meta, com a tendência até o fim do mês."""
     uteis = kpis["dias_uteis_mes"]
-    figura = go.Figure()
-    figura.add_scatter(x=list(range(0, uteis + 1)), y=[kpis["meta"] * d / uteis for d in range(0, uteis + 1)],
-                       name="Ritmo da meta", line={"dash": "dash", "color": "#5d6d75"})
-    figura.add_scatter(x=[0] + por_dia["dia_util"].tolist(), y=[0] + por_dia["acumulado"].tolist(),
-                       name="Realizado acumulado", line={"color": "#0e4d64", "width": 3})
+    dias = [0] + por_dia["dia_util"].tolist()
+    acumulado = [0.0] + graficos.valores(por_dia["acumulado"])
+    series = [
+        {"id": "meta", "name": "Ritmo da meta", "type": "line", "symbol": "none", "z": 1,
+         "lineStyle": {"type": "dashed", "color": graficos.CINZA_ESCURO, "width": 2}, "itemStyle": {"color": graficos.CINZA_ESCURO},
+         "data": [[d, kpis["meta"] * d / uteis] for d in range(0, uteis + 1)]},
+        {"id": "realizado", "name": "Realizado acumulado", "type": "line", "symbol": "circle", "symbolSize": 6, "showSymbol": False,
+         "lineStyle": {"color": graficos.AZUL, "width": 3}, "itemStyle": {"color": graficos.AZUL}, "z": 3,
+         "areaStyle": {"color": {"type": "linear", "x": 0, "y": 0, "x2": 0, "y2": 1, "colorStops": [
+             {"offset": 0, "color": "rgba(14,77,100,0.22)"}, {"offset": 1, "color": "rgba(14,77,100,0.02)"}]}},
+         "data": [list(p) for p in zip(dias, acumulado)]},
+    ]
     if len(por_dia):
         ultimo = por_dia.iloc[-1]
-        figura.add_scatter(x=[ultimo["dia_util"], uteis], y=[ultimo["acumulado"], kpis["tendencia"]],
-                           name="Tendência", line={"dash": "dot", "color": "#f2a93b", "width": 3})
-    figura.update_layout(height=300, margin={"l": 10, "r": 10, "t": 10, "b": 10}, separators=",.",
-                         xaxis_title="dia útil do mês", yaxis_tickprefix="R$ ", legend={"orientation": "h", "y": -0.25},
-                         plot_bgcolor="#fff")
-    return figura
+        series.append({"id": "tendencia", "name": "Tendência", "type": "line", "symbol": "none", "z": 2,
+                       "lineStyle": {"type": "dotted", "color": graficos.AMBAR, "width": 3}, "itemStyle": {"color": graficos.AMBAR},
+                       "data": [[float(ultimo["dia_util"]), float(ultimo["acumulado"])], [uteis, float(kpis["tendencia"])]]})
+    return graficos.opcao(
+        grid={"left": 8, "right": 16, "top": 16, "bottom": 56, "containLabel": True},
+        tooltip={**graficos.TOOLTIP_EIXO, "axisPointer": {"type": "line"}, "valueFormatter": "fn:moeda"},
+        legend=graficos.LEGENDA,
+        xAxis={"type": "value", "min": 0, "max": uteis, "minInterval": 1, "name": "dia útil do mês", "nameLocation": "middle",
+               "nameGap": 26, "nameTextStyle": graficos.ROTULO_EIXO, "axisLabel": graficos.ROTULO_EIXO, "splitLine": {"show": False},
+               "axisLine": {"lineStyle": {"color": graficos.BORDA}}},
+        yAxis=graficos.eixo_valor("moedaCurta"),
+        series=series,
+    )
 
 
 def grafico_marcas(por_marca):
-    figura = go.Figure()
-    figura.add_bar(y=por_marca["marca"], x=por_marca["ano_anterior"], orientation="h", name="Ano anterior", marker_color="#c9d3d8")
-    figura.add_bar(y=por_marca["marca"], x=por_marca["atual"], orientation="h", name="Mês atual", marker_color="#0e4d64")
-    figura.update_layout(height=300, margin={"l": 10, "r": 10, "t": 10, "b": 10}, separators=",.", barmode="group",
-                         xaxis_tickprefix="R$ ", legend={"orientation": "h", "y": -0.2}, plot_bgcolor="#fff")
-    return figura
+    """Barras horizontais: mês atual contra o mesmo período do ano anterior, por marca."""
+    return graficos.opcao(
+        grid={"left": 8, "right": 16, "top": 8, "bottom": 36, "containLabel": True},
+        tooltip={**graficos.TOOLTIP_EIXO, "valueFormatter": "fn:moeda"},
+        legend=graficos.LEGENDA,
+        xAxis=graficos.eixo_valor("moedaCurta"),
+        yAxis=graficos.eixo_categoria(por_marca["marca"]),
+        series=[
+            graficos.barras("anterior", "Ano anterior", graficos.valores(por_marca["ano_anterior"]), graficos.CINZA, horizontal=True),
+            graficos.barras("atual", "Mês atual", graficos.valores(por_marca["atual"]), graficos.AZUL, horizontal=True),
+        ],
+    )
 
 
 def registrar(app):
+    graficos.registrar(app, "cm-d-ritmo", "cm-d-marcas")
+
     @app.callback(Output("cm-d-vendedor", "options"), Input("cm-revenda", "value"))
     def vendedores(revenda):
         metas = ler_parquet("metas_mes")
@@ -93,7 +115,7 @@ def registrar(app):
         return [{"label": v.vendedor, "value": v.vendedor_id} for v in nomes.sort_values("vendedor_id").itertuples()]
 
     @app.callback(
-        Output("cm-d-cards", "children"), Output("cm-d-ritmo", "figure"), Output("cm-d-marcas", "figure"),
+        Output("cm-d-cards", "children"), Output("cm-d-ritmo", "data"), Output("cm-d-marcas", "data"),
         Output("cm-d-grade", "rowData"), Output("cm-d-periodo", "children"),
         Input("cm-revenda", "value"), Input("cm-d-vendedor", "value"), Input("cm-d-canal", "value"), Input("cm-d-marca", "value"),
     )
