@@ -14,7 +14,7 @@ from paineis.comum import dados
 from paineis.servidor import criar_servidor
 
 
-def ip_na_redeA():
+def ip_na_rede():
     """IP desta máquina na rede local: o da interface da rota padrão. connect() em UDP só escolhe
     a rota, não envia nada. None se não houver rede."""
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
@@ -51,5 +51,5 @@ def main(argv=None):
     serve(criar_servidor(), host=args.host, port=args.porta, threads=8)
 
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()
