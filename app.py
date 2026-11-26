@@ -17,9 +17,6 @@ for _variavel in ("DASH_URL_BASE_PATHNAME", "DASH_REQUESTS_PATHNAME_PREFIX", "DA
 
 from paineis.servidor import criar_servidor  # noqa: E402  (depois de limpar o ambiente)
 
-# ERRO INTENCIONAL para testar os logs de falha do deploy no Posit Connect Cloud. Remover depois.
-raise RuntimeError("ERRO INTENCIONAL: teste de logs do deploy no Posit Connect Cloud (app.py)")
-
 server = criar_servidor()
 app = server.paineis["estoque"]
 
