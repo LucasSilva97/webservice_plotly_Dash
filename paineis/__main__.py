@@ -51,5 +51,5 @@ def main(argv=None):
     serve(criar_servidor(), host=args.host, port=args.porta, threads=8)
 
 
-# if __name__ == "__main__":
-#     main()
+if __name__ == "__main__":
+    main()
