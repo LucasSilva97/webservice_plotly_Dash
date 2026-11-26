@@ -269,10 +269,11 @@ transform/              projeto dbt (DuckDB)
   macros/               data de referência, número pt-BR, escada de limites, faixas
   tests/                testes de regra por domínio + teste genérico de grão
 paineis/                três apps Dash num servidor (python -m paineis)
-  comum/                leitura de Parquet, formatos pt-BR, componentes, gráficos ECharts, exportação Excel
+  comum/                leitura de Parquet, formatos pt-BR, componentes (dash-bootstrap-components),
+                        gráficos ECharts, exportação Excel
   estoque/ comercial/ credito/
-  assets/               identidade visual (CSS, logotipo SVG, formatadores do AG Grid),
-                        Apache ECharts 6.1 (echarts.min.js) e a ponte Dash -> ECharts (graficos.js)
+  assets/               Bootstrap 5.3 (bootstrap.min.css) com o tema da Andorinha (estilo.css), logotipo SVG,
+                        formatadores do AG Grid, Apache ECharts 6.1 (echarts.min.js) e a ponte Dash -> ECharts (graficos.js)
 tests/                  pytest
 app.py                  entrada para a hospedagem (Posit Connect Cloud): o objeto Dash `app`
 requirements.txt        dependências dos painéis (o que a hospedagem instala)

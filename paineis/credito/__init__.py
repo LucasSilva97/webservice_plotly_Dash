@@ -2,6 +2,7 @@
 único conjunto de layout e callbacks."""
 from datetime import date
 
+import dash_bootstrap_components as dbc
 from dash import ALL, Dash, Input, Output, State, ctx, dcc, html, no_update
 from dash.exceptions import PreventUpdate
 
@@ -30,38 +31,34 @@ def pagina_da_url(caminho):
 
 def layout_pagina(pagina):
     seletor_opcoes = dados.opcoes_seletor(pagina) if pagina.seletor else []
-    return html.Div([
-        html.Section(className="secao barra-filtros", children=[
-            html.Div(c.filtro("Data de implantação", dcc.Dropdown(
+    return html.Div(className="vstack gap-3", children=[
+        c.barra_filtros(
+            dbc.Col(c.filtro("Data de implantação", dcc.Dropdown(
                 id="cr-seletor", options=seletor_opcoes, value=seletor_opcoes[0]["value"] if seletor_opcoes else None,
-                clearable=False, className="dropdown")), style={} if pagina.seletor else {"display": "none"}),
+                clearable=False)), xs=12, sm=6, md=4, lg=3, xl=2, className="" if pagina.seletor else "d-none"),
             c.filtro("Cliente (código ou nome)", c.dropdown("cr-cliente")),
             *[c.filtro(rotulo, c.dropdown({"tipo": "cr-filtro", "campo": campo})) for campo, rotulo in pagina.filtros.items()],
-        ]),
-        html.Div(id="cr-cards", className="cards"),
-        html.Section(className="secao", children=[
-            html.Div(className="barra-tabela", children=[
-                html.Div([html.H2(pagina.titulo), html.Span(id="cr-contagem", className="nota")]),
-                html.Button("⬇ Exportar Excel", id="cr-exportar", className="botao secundario"),
-            ]),
+        ),
+        c.linha_cards("cr-cards"),
+        c.secao(
+            c.barra_tabela(pagina.titulo, c.botao("⬇ Exportar Excel", "cr-exportar"), nota_id="cr-contagem"),
             # Junto do botão: se o Download ficasse no layout raiz, o Dash dispararia a exportação
             # toda vez que a aba é montada (prevent_initial_call não vale nesse caso).
             dcc.Download(id="cr-download"),
             c.grade("cr-grade", pagina.colunas, altura=480, getRowId=f"params.data.{pagina.chave}",
                     dashGridOptions={"pagination": True, "paginationPageSize": 25,
                                      "rowSelection": {"mode": "singleRow", "checkboxes": False, "enableClickSelection": True}}),
-            html.P("Clique em uma linha para ver os pedidos do cliente nos últimos 90 dias." if pagina.detalhe_cliente else "",
-                   className="nota"),
-        ]),
+            c.nota("Clique em uma linha para ver os pedidos do cliente nos últimos 90 dias." if pagina.detalhe_cliente else ""),
+        ),
         # Detalhe do cliente: nasce escondido a cada aba e aparece ao selecionar uma linha.
-        html.Section(id="cr-detalhe", className="secao", style={"display": "none"}, children=[
-            html.Div(className="barra-tabela", children=[
-                html.Div([html.H2(id="cr-detalhe-titulo"), html.Span(id="cr-detalhe-resumo", className="nota")]),
-                html.Button("Solicitar alteração de limite/prazo", id="cr-abrir-solicitacao", className="botao",
-                            style={} if pagina.slug == "" else {"display": "none"}),
-            ]),
+        c.secao(
+            c.barra_tabela(html.H2(id="cr-detalhe-titulo", className="h6 fw-semibold mb-0"),
+                           c.botao("Solicitar alteração de limite/prazo", "cr-abrir-solicitacao", principal=True,
+                                   className="" if pagina.slug == "" else "d-none"),
+                           nota_id="cr-detalhe-resumo"),
             c.grade("cr-grade-pedidos", COLUNAS_PEDIDOS, altura=260),
-        ]),
+            id="cr-detalhe", style={"display": "none"},
+        ),
     ])
 
 
@@ -72,32 +69,29 @@ def montar_layout():
     return html.Div([
         dcc.Location(id="cr-url"),
         c.cabecalho("Crédito e Prazo", "Consulta de limite e prazo, cobrança, solicitações e histórico" + faltam, PREFIXO),
-        html.Main(className="conteudo", children=[
-            html.Div(className="secao-cabecalho", children=[
-                html.Nav(id="cr-abas", className="abas"),
-                html.Div(style={"minWidth": "260px"}, children=c.filtro("Revenda", dcc.Dropdown(
-                    id="cr-revenda", options=[{"label": f"{r.revenda_id} · {r.revenda}", "value": r.revenda_id} for r in nomes.itertuples()],
-                    value=20, clearable=False, className="dropdown"))),
-            ]),
+        c.conteudo(
+            c.barra_pagina(c.abas("cr-abas"), html.Div(style={"minWidth": "260px"}, children=c.filtro("Revenda", dcc.Dropdown(
+                id="cr-revenda", options=[{"label": f"{r.revenda_id} · {r.revenda}", "value": r.revenda_id} for r in nomes.itertuples()],
+                value=20, clearable=False)))),
             html.Div(id="cr-pagina"),
             c.rodape_dados(data_geracao("credito_clientes"), data_referencia()),
-        ]),
+        ),
         c.modal("cr-sol", "Solicitar alteração", [
-            html.P(id="cr-sol-cliente", className="nota"),
-            html.Div(className="formulario", children=[
-                c.filtro("Novo limite", dcc.Dropdown(id="cr-sol-limite", options=[{"label": formatos.moeda(v, 0), "value": v} for v in ESCADA],
-                                                     placeholder="manter", className="dropdown")),
-                c.filtro("Novo prazo", dcc.Dropdown(id="cr-sol-prazo", options=[{"label": "À vista" if d == 0 else f"{d} dias", "value": d}
-                                                                                for d in solicitacao.PRAZOS_VALIDOS],
-                                                    placeholder="manter", className="dropdown")),
-                c.filtro("Solicitante", dcc.Input(id="cr-sol-solicitante", placeholder="ex.: V201", type="text")),
-                c.filtro("Observação", dcc.Textarea(id="cr-sol-observacao", style={"minHeight": "60px"})),
+            html.P(id="cr-sol-cliente", className=f"{c.NOTA} mb-0"),
+            dbc.Row(className="g-3", children=[
+                dbc.Col(c.filtro("Novo limite", dcc.Dropdown(
+                    id="cr-sol-limite", options=[{"label": formatos.moeda(v, 0), "value": v} for v in ESCADA], placeholder="manter")), md=6),
+                dbc.Col(c.filtro("Novo prazo", dcc.Dropdown(
+                    id="cr-sol-prazo", options=[{"label": "À vista" if d == 0 else f"{d} dias", "value": d} for d in solicitacao.PRAZOS_VALIDOS],
+                    placeholder="manter")), md=6),
+                dbc.Col(c.filtro("Solicitante", dbc.Input(id="cr-sol-solicitante", placeholder="ex.: V201", type="text", size="sm")), md=6),
+                dbc.Col(c.filtro("Observação", dbc.Textarea(id="cr-sol-observacao", size="sm", style={"minHeight": "60px"})), md=6),
             ]),
             html.Div(id="cr-sol-aviso"),
-            html.Div(html.Button("Registrar solicitação", id="cr-sol-enviar", className="botao")),
-            html.P("Grava só no ERP local da demonstração (data/fontes/erp.sqlite). A solicitação aparece na aba "
-                   "Solicitações depois de rodar o ELT com --manter-fontes.", className="nota"),
-        ], largura="720px"),
+            html.Div(c.botao("Registrar solicitação", "cr-sol-enviar", principal=True)),
+            c.nota("Grava só no ERP local da demonstração (data/fontes/erp.sqlite). A solicitação aparece na aba "
+                   "Solicitações depois de rodar o ELT com --manter-fontes."),
+        ], tamanho="lg"),
         dcc.Store(id="cr-cliente-selecionado"),
     ])
 
@@ -111,10 +105,9 @@ def criar_app(servidor):
     @app.callback(Output("cr-pagina", "children"), Output("cr-abas", "children"), Input("cr-url", "pathname"))
     def rotear(caminho):
         pagina = pagina_da_url(caminho)
-        abas = [dcc.Link(p.titulo, href=f"{PREFIXO}{p.slug}", className="ativa" if p is pagina else "") for p in PAGINAS.values()]
+        abas = c.links_abas((p.titulo, f"{PREFIXO}{p.slug}", p is pagina) for p in PAGINAS.values())
         if pagina is None:
-            return html.Div(className="secao", children=[html.H2("Página não encontrada"),
-                                                         dcc.Link("Voltar para Limite e prazo", href=PREFIXO)]), abas
+            return c.secao(dcc.Link("Voltar para Limite e prazo", href=PREFIXO), titulo="Página não encontrada"), abas
         return layout_pagina(pagina), abas
 
     # A URL é State: numa troca de aba quem dispara é a montagem dos componentes da aba nova. Como
@@ -155,26 +148,27 @@ def criar_app(servidor):
         return {}, f"Pedidos de {linha['cliente_id']} – {nome}", texto, para_grade(pedidos), cliente
 
     @app.callback(
-        Output("cr-sol-fundo", "className"), Output("cr-sol-cliente", "children"), Output("cr-sol-aviso", "children"),
-        Input("cr-abrir-solicitacao", "n_clicks"), Input("cr-sol-fechar", "n_clicks"), Input("cr-sol-enviar", "n_clicks"),
+        Output("cr-sol", "is_open"), Output("cr-sol-cliente", "children"), Output("cr-sol-aviso", "children"),
+        Input("cr-abrir-solicitacao", "n_clicks"), Input("cr-sol-enviar", "n_clicks"),
         State("cr-cliente-selecionado", "data"), State("cr-sol-limite", "value"), State("cr-sol-prazo", "value"),
         State("cr-sol-solicitante", "value"), State("cr-sol-observacao", "value"), prevent_initial_call=True,
     )
-    def solicitar(abrir, _, __, cliente, limite, prazo, solicitante, observacao):
+    def solicitar(abrir, _, cliente, limite, prazo, solicitante, observacao):
         if ctx.triggered_id == "cr-abrir-solicitacao" and not abrir:
             raise PreventUpdate  # botão recém-montado pela troca de aba, ninguém clicou
-        if ctx.triggered_id == "cr-sol-fechar" or not cliente:
-            return "modal-fundo oculto", no_update, ""
+        if not cliente:
+            return False, no_update, ""
         descricao = (f"{cliente['cliente_id']} – {cliente['nome']} · limite atual {formatos.moeda(cliente.get('limite_atual'))} "
                      f"· prazo atual {cliente.get('prazo_atual') or '—'}")
         if ctx.triggered_id == "cr-abrir-solicitacao":
-            return "modal-fundo", descricao, ""
+            return True, descricao, ""
         try:
             numero = solicitacao.registrar(cliente["revenda_id"], cliente["cliente_id"], cliente.get("limite_atual"),
                                            limite, prazo, solicitante, observacao)
         except ValueError as erro:
-            return no_update, no_update, html.Div(str(erro), className="aviso erro")
-        return no_update, no_update, html.Div(f"Solicitação nº {numero} registrada no ERP local, em análise.", className="aviso")
+            return no_update, no_update, dbc.Alert(str(erro), color="danger", className="mb-0 py-2")
+        return no_update, no_update, dbc.Alert(f"Solicitação nº {numero} registrada no ERP local, em análise.",
+                                               color="success", className="mb-0 py-2")
 
     @app.callback(
         Output("cr-download", "data"), Input("cr-exportar", "n_clicks"),

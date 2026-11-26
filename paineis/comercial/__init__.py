@@ -31,15 +31,12 @@ def montar_layout():
     return html.Div([
         dcc.Location(id="cm-url"),
         c.cabecalho("Comercial", "Vendas, metas, carteira, ruptura e fabricante parceiro", PREFIXO),
-        html.Main(className="conteudo", children=[
-            html.Div(className="secao-cabecalho", children=[
-                html.Nav(id="cm-abas", className="abas"),
-                html.Div(style={"minWidth": "260px"}, children=c.filtro(
-                    "Revenda", dcc.Dropdown(id="cm-revenda", options=opcoes, value=20, clearable=False, className="dropdown"))),
-            ]),
+        c.conteudo(
+            c.barra_pagina(c.abas("cm-abas"), html.Div(style={"minWidth": "260px"}, children=c.filtro(
+                "Revenda", dcc.Dropdown(id="cm-revenda", options=opcoes, value=20, clearable=False)))),
             html.Div(id="cm-pagina"),
             c.rodape_dados(data_geracao("vendas_diarias"), data_referencia()),
-        ]),
+        ),
     ])
 
 
@@ -52,11 +49,9 @@ def criar_app(servidor):
     @app.callback(Output("cm-pagina", "children"), Output("cm-abas", "children"), Input("cm-url", "pathname"))
     def rotear(caminho):
         atual = resolver(caminho)
-        abas = [dcc.Link(titulo, href=f"{PREFIXO}{slug}", className="ativa" if slug == atual else "")
-                for slug, (titulo, _) in PAGINAS.items()]
+        abas = c.links_abas((titulo, f"{PREFIXO}{slug}", slug == atual) for slug, (titulo, _) in PAGINAS.items())
         if atual is None:
-            return html.Div(className="secao", children=[html.H2("Página não encontrada"),
-                                                         dcc.Link("Voltar ao Diário de vendas", href=f"{PREFIXO}diario")]), abas
+            return c.secao(dcc.Link("Voltar ao Diário de vendas", href=f"{PREFIXO}diario"), titulo="Página não encontrada"), abas
         return PAGINAS[atual][1].layout(), abas
 
     for _, modulo in PAGINAS.values():

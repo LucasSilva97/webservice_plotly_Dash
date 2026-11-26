@@ -2,6 +2,7 @@
 from datetime import date
 
 import pandas as pd
+import dash_bootstrap_components as dbc
 from dash import Input, Output, State, dcc, html
 
 from paineis.comercial import dados
@@ -28,25 +29,21 @@ COLUNAS = [
 def layout():
     meses = sorted(ler_parquet("metas_mes")["mes"].unique(), reverse=True)
     atual = int(dados.periodo_atual()["mes"])
-    return html.Div([
-        html.Section(className="secao barra-filtros", children=[
+    return html.Div(className="vstack gap-3", children=[
+        c.barra_filtros(
             c.filtro("Mês", dcc.Dropdown(id="cm-m-mes", options=[{"label": formatos.mes_rotulo(int(m)), "value": int(m)} for m in meses],
-                                         value=atual, clearable=False, className="dropdown")),
-            html.Span(id="cm-m-nota", className="nota"),
-        ]),
-        html.Div(id="cm-m-cards", className="cards"),
-        html.Section(className="secao", children=[html.H2("Meta x tendência por vendedor"),
-                                                  graficos.grafico("cm-m-grafico", 280)]),
-        html.Section(className="secao", children=[
-            html.Div(className="barra-tabela", children=[
-                html.H2("Metas do mês"),
-                html.Button("⬇ Exportar", id="cm-m-exportar", className="botao secundario"),
-            ]),
+                                         value=atual, clearable=False)),
+            dbc.Col(html.Span(id="cm-m-nota", className=c.NOTA), xs=12, lg=True),
+        ),
+        c.linha_cards("cm-m-cards"),
+        c.secao(graficos.grafico("cm-m-grafico", 280), titulo="Meta x tendência por vendedor"),
+        c.secao(
+            c.barra_tabela("Metas do mês", c.botao("⬇ Exportar", "cm-m-exportar")),
             c.grade("cm-m-grade", COLUNAS, altura=300),
-            html.P("A linha fixa no topo é a meta própria da revenda, definida à parte (não é a soma dos vendedores). "
-                   "Caixas e meta de caixas contam só os produtos do fabricante do programa.", className="nota"),
+            c.nota("A linha fixa no topo é a meta própria da revenda, definida à parte (não é a soma dos vendedores). "
+                   "Caixas e meta de caixas contam só os produtos do fabricante do programa."),
             dcc.Download(id="cm-m-download"),
-        ]),
+        ),
     ])
 
 

@@ -1,23 +1,25 @@
 """Painel do fabricante parceiro: caixas, clientes com compra e ruptura, mês a mês,
 ano corrente x ano anterior x meta do programa."""
-from dash import Input, Output, dcc, html
+import dash_bootstrap_components as dbc
+from dash import Input, Output, html
 
 from paineis.comercial import dados
+from paineis.comum import componentes as c
 from paineis.comum import formatos, graficos
 
+POSITIVO, NEGATIVO = "text-success fw-semibold", "text-danger fw-semibold"
 SPARKLINES = ("cm-f-spark-caixas", "cm-f-spark-clientes", "cm-f-spark-ruptura")
 CANAIS = [{"label": "Todos", "value": "TODOS"}] + [{"label": v, "value": k} for k, v in dados.CANAIS.items()]
 
 
 def layout():
-    return html.Div([
-        html.Section(className="secao barra-filtros", children=[
-            html.Label([html.Span("Canal"), dcc.RadioItems(id="cm-f-canal", options=CANAIS, value="TODOS", className="radio-pilula")],
-                       className="filtro"),
-            html.Span(f"Programa do fabricante parceiro ({dados.FABRICANTE_PROGRAMA}): só os produtos dele entram em caixas e clientes. "
-                      "'Todos' conta uma vez o cliente que comprou nos dois canais.", className="nota"),
-        ]),
-        html.Section(className="secao", children=html.Div(id="cm-f-blocos", className="blocos-fabricante")),
+    return html.Div(className="vstack gap-3", children=[
+        c.barra_filtros(
+            dbc.Col(c.filtro("Canal", c.pilulas("cm-f-canal", CANAIS, "TODOS")), xs=12, md="auto"),
+            dbc.Col(html.Span(f"Programa do fabricante parceiro ({dados.FABRICANTE_PROGRAMA}): só os produtos dele entram em caixas "
+                              "e clientes. 'Todos' conta uma vez o cliente que comprou nos dois canais.", className=c.NOTA), xs=12, md=True),
+        ),
+        c.secao(html.Div(id="cm-f-blocos", className="vstack gap-4")),
     ])
 
 
@@ -42,39 +44,43 @@ def _sparkline(id, atual, anterior, formato):
 
 def _celula(valor, tipo="numero", destaque=False):
     if formatos.vazio(valor):
-        return html.Td("—", className="cinza")
+        return html.Td("—", className="text-body-secondary")
     if tipo == "pct":
-        classe = "positivo" if valor >= (100 if destaque else 0) else "negativo"
+        classe = POSITIVO if valor >= (100 if destaque else 0) else NEGATIVO
         texto = ("+" if valor > 0 and not destaque else "") + formatos.pct(valor)
         return html.Td(texto, className=classe)
     if tipo == "pp":
-        return html.Td(("+" if valor > 0 else "") + formatos.numero(valor, 1) + " p.p.", className="positivo" if valor >= 0 else "negativo")
+        return html.Td(("+" if valor > 0 else "") + formatos.numero(valor, 1) + " p.p.", className=POSITIVO if valor >= 0 else NEGATIVO)
     if tipo == "pct_simples":
         return html.Td(formatos.pct(valor))
     return html.Td(formatos.numero(valor))
 
 
 def _tabela(linhas, com_total=True):
-    cabecalho = html.Tr([html.Th("")] + [html.Th(m) for m in formatos.MESES] + ([html.Th("Total")] if com_total else []))
+    cabecalho = html.Tr([html.Th("", className="text-start")] + [html.Th(m) for m in formatos.MESES] + ([html.Th("Total")] if com_total else []))
     corpo = []
     for rotulo, valores, tipo, destaque, total in linhas:
-        celulas = [html.Td(rotulo)] + [_celula(v, tipo, destaque) for v in valores]
+        celulas = [html.Td(rotulo, className="text-start")] + [_celula(v, tipo, destaque) for v in valores]
         if com_total:
             celula_total = _celula(total, tipo, destaque)
-            celula_total.className = getattr(celula_total, "className", "") + " total"
+            celula_total.className = (getattr(celula_total, "className", None) or "") + " fw-semibold bg-body-tertiary"
             celulas.append(celula_total)
         corpo.append(html.Tr(celulas))
-    return html.Div(className="rolagem", children=html.Table([html.Thead(cabecalho), html.Tbody(corpo)], className="tabela-simples"))
+    return dbc.Table([html.Thead(cabecalho, className="table-primary"), html.Tbody(corpo)],
+                     size="sm", hover=True, responsive=True, className="text-end text-nowrap mb-0")
 
 
 def _bloco(selo, titulo, subtitulo, sparkline, tabela):
-    return html.Div(className="bloco-fabricante", children=[
-        html.Div([
-            html.Div(className="bloco-titulo", children=[html.Span(selo, className="selo"),
-                                                       html.Div([html.H2(titulo), html.Span(subtitulo, className="nota")])]),
+    return dbc.Row(className="align-items-center g-3", children=[
+        dbc.Col(lg=3, children=[
+            html.Div(className="d-flex align-items-center gap-2", children=[
+                html.Span(selo, className="rounded-circle bg-primary text-warning fw-bolder d-flex align-items-center "
+                                          "justify-content-center flex-shrink-0", style={"width": "40px", "height": "40px"}),
+                html.Div([html.H2(titulo, className="h6 fw-semibold mb-0"), html.Span(subtitulo, className=c.NOTA)]),
+            ]),
             sparkline,
         ]),
-        tabela,
+        dbc.Col(tabela, lg=9),
     ])
 
 

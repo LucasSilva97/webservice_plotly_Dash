@@ -2,7 +2,8 @@
 sozinha a publicação nova, e não há DataFrame guardado no navegador."""
 from datetime import date
 
-from dash import Input, Output, State, ctx, dcc, html, no_update
+import dash_bootstrap_components as dbc
+from dash import Input, Output, State, dcc, html, no_update
 
 from paineis.comum import componentes as c
 from paineis.comum import exportar, formatos, graficos
@@ -74,31 +75,26 @@ def registrar(app):
         return dcc.send_bytes(planilha, f"estoque_reposicao_{filtros[0]}_{date.today():%Y-%m-%d}.xlsx")
 
     @app.callback(
-        Output("ep-detalhe-fundo", "className"), Output("ep-detalhe-titulo", "children"),
+        Output("ep-detalhe", "is_open"), Output("ep-detalhe-titulo", "children"),
         Output("ep-grade-notas", "rowData"), Output("ep-grade-recebidas", "rowData"),
-        Input("ep-grade", "cellClicked"), Input("ep-detalhe-fechar", "n_clicks"),
-        State("ep-revenda", "value"), prevent_initial_call=True,
+        Input("ep-grade", "cellClicked"), State("ep-revenda", "value"), prevent_initial_call=True,
     )
-    def detalhe(clique, _, revenda):
-        if ctx.triggered_id == "ep-detalhe-fechar":
-            return "modal-fundo oculto", no_update, no_update, no_update
+    def detalhe(clique, revenda):
         if not clique or clique.get("colId") not in ("qtd_transito", "transf_apos_compra") or not clique.get("value"):
             return no_update, no_update, no_update, no_update
         produto = int(clique["rowId"])
         notas, recebidas = dados.detalhe_produto(revenda, produto)
         nome = notas["produto"].iloc[0] if len(notas) else f"produto {produto}"
-        return "modal-fundo", f"{produto} – {nome}", para_grade(notas), para_grade(recebidas)
+        return True, f"{produto} – {nome}", para_grade(notas), para_grade(recebidas)
 
     @app.callback(
-        Output("ep-snap-fundo", "className"), Output("ep-snap-data", "options"), Output("ep-snap-data", "value"),
-        Input("ep-abrir-snapshots", "n_clicks"), Input("ep-snap-fechar", "n_clicks"), prevent_initial_call=True,
+        Output("ep-snap", "is_open"), Output("ep-snap-data", "options"), Output("ep-snap-data", "value"),
+        Input("ep-abrir-snapshots", "n_clicks"), prevent_initial_call=True,
     )
-    def abrir_snapshots(_, __):
-        if ctx.triggered_id == "ep-snap-fechar":
-            return "modal-fundo oculto", no_update, no_update
+    def abrir_snapshots(_):
         datas = dados.datas_snapshot()
         opcoes = [{"label": formatos.data(date.fromisoformat(d)), "value": d} for d in datas]
-        return "modal-fundo", opcoes, (datas[0] if datas else None)
+        return True, opcoes, (datas[0] if datas else None)
 
     @app.callback(
         Output("ep-snap-resumo", "children"), Output("ep-snap-grade", "rowData"), Output("ep-snap-filtros", "children"),
@@ -106,7 +102,7 @@ def registrar(app):
     )
     def montar_snapshot(data_snapshot, *filtros):
         if not data_snapshot:
-            return html.P("Nenhum snapshot gravado ainda.", className="nota"), [], ""
+            return dbc.Col(html.P("Nenhum snapshot gravado ainda.", className=c.NOTA)), [], ""
         df = dados.filtrar(dados.carregar_snapshot(data_snapshot), *filtros)
         texto = "Filtros da tela: " + "; ".join(f"{k}: {v}" for k, v in descrever_filtros(*filtros))
         return montar_cards(dados.indicadores(df)), para_grade(df), texto

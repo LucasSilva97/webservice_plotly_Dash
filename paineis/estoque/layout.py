@@ -1,4 +1,5 @@
 """Layout do painel de Estoque e Reposição."""
+import dash_bootstrap_components as dbc
 from dash import dcc, html
 
 from paineis.comum import componentes as c
@@ -55,69 +56,61 @@ def montar_layout():
     revendas = df[["revenda_id", "revenda"]].drop_duplicates().sort_values("revenda_id")
     opcoes_revenda = [{"label": f"{r.revenda_id} · {r.revenda}", "value": r.revenda_id} for r in revendas.itertuples()]
 
-    filtros = html.Section(className="secao barra-filtros", children=[
-        c.filtro("Revenda", dcc.Dropdown(id="ep-revenda", options=opcoes_revenda, value=20, clearable=False, className="dropdown")),
+    filtros = c.barra_filtros(
+        c.filtro("Revenda", dcc.Dropdown(id="ep-revenda", options=opcoes_revenda, value=20, clearable=False)),
         c.filtro("Período de venda", dcc.Dropdown(id="ep-periodo", options=[{"label": v, "value": k} for k, v in dados.PERIODOS.items()],
-                                                  value="MES_ATUAL", clearable=False, className="dropdown")),
-        c.filtro("Base do estoque", dcc.RadioItems(id="ep-base", options=[{"label": v, "value": k} for k, v in dados.BASES.items()],
-                                                   value="SISTEMA", className="radio-pilula")),
+                                                  value="MES_ATUAL", clearable=False)),
         c.filtro("Marca", c.dropdown("ep-marca", options=opcoes(df["marca"]))),
         c.filtro("Categoria", c.dropdown("ep-categoria", options=opcoes(df["categoria"]))),
         c.filtro("Produto", c.dropdown("ep-produto", options=[
             {"label": f"{p.produto_id} – {p.produto}", "value": p.produto_id}
             for p in df[["produto_id", "produto"]].drop_duplicates().sort_values("produto_id").itertuples()])),
-        c.filtro("Ação", dcc.RadioItems(id="ep-acao", options=[{"label": v, "value": k} for k, v in dados.ACOES.items()],
-                                        value="TODOS", className="radio-pilula")),
-        html.Button("Limpar filtros", id="ep-limpar", className="botao secundario"),
+        dbc.Col(c.filtro("Base do estoque", c.pilulas("ep-base", [{"label": v, "value": k} for k, v in dados.BASES.items()], "SISTEMA")),
+                xs=12, md="auto"),
+        dbc.Col(c.filtro("Ação", c.pilulas("ep-acao", [{"label": v, "value": k} for k, v in dados.ACOES.items()], "TODOS")),
+                xs=12, md="auto"),
+        dbc.Col(c.botao("Limpar filtros", "ep-limpar"), xs="auto", className="ms-md-auto"),
+    )
+
+    gauges = dbc.Row(className="g-3", children=[
+        dbc.Col(c.secao(graficos.grafico(id, 190), titulo=titulo, className="h-100"), md=4)
+        for id, titulo in [("ep-gauge-sellin", "Sell-in / sell-out (HL)"),
+                           ("ep-gauge-marca", f"Dias de estoque · {dados.MARCA_PRINCIPAL}"),
+                           ("ep-gauge-geral", "Dias de estoque · geral")]
     ])
 
-    indicadores = html.Section(children=[
-        html.Div(id="ep-cards", className="cards"),
-        html.Div(className="graficos", style={"marginTop": "12px"}, children=[
-            html.Div(className="secao", children=[html.H2("Sell-in / sell-out (HL)"), graficos.grafico("ep-gauge-sellin", 190)]),
-            html.Div(className="secao", children=[html.H2(f"Dias de estoque · {dados.MARCA_PRINCIPAL}"), graficos.grafico("ep-gauge-marca", 190)]),
-            html.Div(className="secao", children=[html.H2("Dias de estoque · geral"), graficos.grafico("ep-gauge-geral", 190)]),
-        ]),
-    ])
-
-    tabela = html.Section(className="secao", children=[
-        html.Div(className="barra-tabela", children=[
-            html.Div([html.H2("Reposição por produto"),
-                      html.Span(id="ep-contagem", className="nota")]),
-            html.Div(className="acoes", children=[
-                html.Button("⬇ Exportar", id="ep-exportar", className="botao secundario"),
-                html.Button("📅 Snapshots", id="ep-abrir-snapshots", className="botao secundario"),
-            ]),
-        ]),
+    tabela = c.secao(
+        c.barra_tabela("Reposição por produto",
+                       c.botao("⬇ Exportar", "ep-exportar"), c.botao("📅 Snapshots", "ep-abrir-snapshots"), nota_id="ep-contagem"),
         c.grade("ep-grade", COLUNAS, getRowId="params.data.produto_id"),
-        html.P(f"Faixa: mínimo = média x {dados.FAIXA_DDE[0]} dias úteis, máximo = média x {dados.FAIXA_DDE[1]}. "
-               "Clique em 'Em trânsito' ou 'Transf. após compra' para ver as notas.", className="nota"),
+        c.nota(f"Faixa: mínimo = média x {dados.FAIXA_DDE[0]} dias úteis, máximo = média x {dados.FAIXA_DDE[1]}. "
+               "Clique em 'Em trânsito' ou 'Transf. após compra' para ver as notas."),
         dcc.Download(id="ep-download"),
-    ])
+    )
 
     detalhe = c.modal("ep-detalhe", "Produto", [
-        html.H3("Em trânsito (sem entrada na revenda)"),
+        html.H3("Em trânsito (sem entrada na revenda)", className="h6 fw-semibold mb-0"),
         c.grade("ep-grade-notas", COLUNAS_NOTAS, altura=200),
-        html.H3("Transferências recebidas depois da última compra"),
+        html.H3("Transferências recebidas depois da última compra", className="h6 fw-semibold mb-0"),
         c.grade("ep-grade-recebidas", COLUNAS_RECEBIDAS, altura=200),
     ])
 
     snapshots = c.modal("ep-snap", "Snapshots diários", [
-        html.Div(className="barra-tabela", children=[
-            c.filtro("Data do snapshot", dcc.Dropdown(id="ep-snap-data", clearable=False, className="dropdown", style={"minWidth": "200px"})),
-            html.Span(id="ep-snap-filtros", className="nota"),
-            html.Button("⬇ Exportar snapshot", id="ep-snap-exportar", className="botao secundario"),
+        dbc.Row(className="g-3 align-items-end", children=[
+            dbc.Col(c.filtro("Data do snapshot", dcc.Dropdown(id="ep-snap-data", clearable=False)), xs=12, md=3),
+            dbc.Col(html.Span(id="ep-snap-filtros", className=c.NOTA), xs=12, md=True),
+            dbc.Col(c.botao("⬇ Exportar snapshot", "ep-snap-exportar"), xs="auto"),
         ]),
-        dcc.Loading(html.Div(id="ep-snap-resumo", className="cards")),
+        dbc.Spinner(dbc.Row(id="ep-snap-resumo", className="g-3"), color="primary"),
         c.grade("ep-snap-grade", COLUNAS, altura=380),
         dcc.Download(id="ep-snap-download"),
-    ], largura="1200px")
+    ])
 
     return html.Div([
         c.cabecalho("Estoque e Reposição", "Saldo, cobertura, trânsito e necessidade de reposição", "/estoque/"),
-        html.Main(className="conteudo", children=[
-            filtros, indicadores, tabela,
+        c.conteudo(
+            filtros, c.linha_cards("ep-cards"), gauges, tabela,
             c.rodape_dados(data_geracao("estoque_reposicao"), data_referencia()),
-        ]),
+        ),
         detalhe, snapshots,
     ])

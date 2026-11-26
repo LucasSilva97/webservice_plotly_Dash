@@ -3,6 +3,7 @@ import math
 from datetime import date
 
 import pandas as pd
+import dash_bootstrap_components as dbc
 from dash import Input, Output, State, dcc, html
 
 from paineis.comercial import dados
@@ -44,28 +45,25 @@ def cor_ruptura(valor):
 
 def layout():
     meses = sorted(ler_parquet("ruptura_vendedor_mes")["mes"].unique(), reverse=True)
-    return html.Div([
-        html.Section(className="secao barra-filtros", children=[
+    return html.Div(className="vstack gap-3", children=[
+        c.barra_filtros(
             c.filtro("Vendedor", c.dropdown("cm-r-vendedor", multi=False)),
             c.filtro("Mês", dcc.Dropdown(id="cm-r-mes", options=[{"label": formatos.mes_rotulo(int(m)), "value": int(m)} for m in meses],
-                                         value=int(meses[1] if len(meses) > 1 else meses[0]), clearable=False, className="dropdown")),
-            html.Span("Ruptura = clientes ativos da carteira sem compra no mês. Abre no último mês fechado; "
-                      "o mês corrente, ainda em andamento, também está na lista.", className="nota"),
+                                         value=int(meses[1] if len(meses) > 1 else meses[0]), clearable=False)),
+            dbc.Col(html.Span("Ruptura = clientes ativos da carteira sem compra no mês. Abre no último mês fechado; "
+                              "o mês corrente, ainda em andamento, também está na lista.", className=c.NOTA), xs=12, lg=True),
+        ),
+        dbc.Row(className="g-3", children=[
+            dbc.Col(c.secao(html.Div(id="cm-r-resumo"), titulo="Cobertura da carteira", className="h-100"), lg=4),
+            dbc.Col(c.secao(graficos.grafico("cm-r-cobertura", 230), titulo="Evolução da cobertura", className="h-100"), lg=4),
+            dbc.Col(c.secao(graficos.grafico("cm-r-ruptura", 230), titulo="Evolução da ruptura", className="h-100"), lg=4),
         ]),
-        html.Div(className="graficos", children=[
-            html.Section(className="secao", children=[html.H2("Cobertura da carteira"), html.Div(id="cm-r-resumo")]),
-            html.Section(className="secao", children=[html.H2("Evolução da cobertura"), graficos.grafico("cm-r-cobertura", 230)]),
-            html.Section(className="secao", children=[html.H2("Evolução da ruptura"), graficos.grafico("cm-r-ruptura", 230)]),
-        ]),
-        html.Section(className="secao", children=[
-            html.Div(className="barra-tabela", children=[
-                html.H2(id="cm-r-titulo"),
-                html.Button("⬇ Exportar", id="cm-r-exportar", className="botao secundario"),
-            ]),
+        c.secao(
+            c.barra_tabela(html.H2(id="cm-r-titulo", className="h6 fw-semibold mb-0"), c.botao("⬇ Exportar", "cm-r-exportar")),
             c.grade("cm-r-grade", COLUNAS, altura=280),
-            html.P("Ruptura: até 20% baixa, 20 a 30% média, 30 a 40% alta, 40% ou mais crítica.", className="nota"),
+            c.nota("Ruptura: até 20% baixa, 20 a 30% média, 30 a 40% alta, 40% ou mais crítica."),
             dcc.Download(id="cm-r-download"),
-        ]),
+        ),
     ])
 
 
@@ -116,13 +114,13 @@ def registrar(app):
         do_mes, total, evolucao, variacao = dados.ruptura(revenda, mes, vendedor)
         evolucao = evolucao.tail(13)
         chip = "Sem comparativo" if variacao is None else f"{'▲' if variacao >= 0 else '▼'} {formatos.numero(abs(variacao), 1)} p.p. vs mês anterior"
-        resumo = html.Div(style={"display": "grid", "gridTemplateColumns": "1fr 1fr", "alignItems": "center"}, children=[
-            graficos.grafico("cm-r-rosca", 180, _rosca(total)),
-            html.Div([
-                html.P(["Clientes ativos: ", html.Strong(formatos.numero(total["clientes_ativos"]))]),
-                html.P(["Com compra: ", html.Strong(formatos.numero(total["clientes_cobertos"]))]),
-                html.P(["Sem compra: ", html.Strong(formatos.numero(total["clientes_sem_compra"]))]),
-                html.P(chip, className="positivo" if (variacao or 0) >= 0 else "negativo"),
+        resumo = dbc.Row(className="align-items-center g-2", children=[
+            dbc.Col(graficos.grafico("cm-r-rosca", 180, _rosca(total)), xs=6),
+            dbc.Col(xs=6, className="vstack gap-2", children=[
+                html.Div(["Clientes ativos: ", html.Strong(formatos.numero(total["clientes_ativos"]))]),
+                html.Div(["Com compra: ", html.Strong(formatos.numero(total["clientes_cobertos"]))]),
+                html.Div(["Sem compra: ", html.Strong(formatos.numero(total["clientes_sem_compra"]))]),
+                dbc.Badge(chip, color="success" if (variacao or 0) >= 0 else "danger", className="align-self-start"),
             ]),
         ])
         cores_cob = ["#0e4d64" if m == mes else "#7fb3c2" for m in evolucao["mes"]]

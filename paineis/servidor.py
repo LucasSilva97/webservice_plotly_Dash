@@ -11,21 +11,29 @@ from paineis.comum import dados, formatos
 PAGINA_INICIAL = """<!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Andorinha · painéis</title><link rel="icon" href="/estoque/assets/logo.svg">
+<link rel="stylesheet" href="/estoque/assets/bootstrap.min.css">
 <link rel="stylesheet" href="/estoque/assets/estilo.css"></head>
 <body>
-<header class="topo"><a class="marca" href="/"><img src="/estoque/assets/logo.svg" alt="">
-<span>Andorinha<small>painéis de demonstração</small></span></a>
-<div class="titulo-modulo"><h1>Distribuidora Andorinha (fictícia)</h1>
-<span>Dados sintéticos publicados pelo ELT · referência {referencia}</span></div></header>
-<main class="conteudo inicio">
-<div class="inicio-cartoes">
-<a href="/estoque/"><section class="secao"><h2>Estoque e Reposição</h2>
-<p>Saldo, cobertura em dias úteis, trânsito entre unidades e quanto puxar ou reduzir por produto e revenda. Snapshot diário.</p></section></a>
-<a href="/comercial/"><section class="secao"><h2>Comercial</h2>
-<p>Diário de vendas, metas, carteira de clientes, ruptura de cobertura e o painel do fabricante parceiro.</p></section></a>
-<a href="/credito/"><section class="secao"><h2>Crédito e Prazo</h2>
-<p>Consulta de limite e prazo, cobrança, solicitações, histórico de implantações e pedidos do cliente.</p></section></a>
+<nav class="navbar navbar-dark bg-primary py-2"><div class="container-fluid px-4 gap-3">
+<a class="navbar-brand d-flex align-items-center gap-2 me-2 fs-6" href="/"><img src="/estoque/assets/logo.svg" alt="" width="34" height="34">
+<span><span class="d-block fw-bold lh-1">Andorinha</span><small class="d-block fw-normal opacity-75">painéis de demonstração</small></span></a>
+<div class="flex-grow-1 text-white"><h1 class="h5 mb-0">Distribuidora Andorinha (fictícia)</h1>
+<small class="opacity-75">Dados sintéticos publicados pelo ELT · referência {referencia}</small></div></div></nav>
+<main class="container py-4">
+<div class="row row-cols-1 row-cols-md-3 g-3">
+{cartoes}
 </div></main></body></html>"""
+CARTAO = """<div class="col"><div class="card h-100 shadow-sm"><div class="card-body">
+<h2 class="h6 fw-semibold"><a href="{link}" class="stretched-link text-decoration-none">{titulo}</a></h2>
+<p class="card-text text-body-secondary mb-0">{texto}</p></div></div></div>"""
+CARTOES = [
+    ("/estoque/", "Estoque e Reposição",
+     "Saldo, cobertura em dias úteis, trânsito entre unidades e quanto puxar ou reduzir por produto e revenda. Snapshot diário."),
+    ("/comercial/", "Comercial",
+     "Diário de vendas, metas, carteira de clientes, ruptura de cobertura e o painel do fabricante parceiro."),
+    ("/credito/", "Crédito e Prazo",
+     "Consulta de limite e prazo, cobrança, solicitações, histórico de implantações e pedidos do cliente."),
+]
 
 
 def criar_servidor():
@@ -40,6 +48,7 @@ def criar_servidor():
 
     @servidor.route("/")
     def inicio():
-        return PAGINA_INICIAL.replace("{referencia}", formatos.data(dados.data_referencia()))
+        cartoes = "\n".join(CARTAO.format(link=link, titulo=titulo, texto=texto) for link, titulo, texto in CARTOES)
+        return PAGINA_INICIAL.replace("{referencia}", formatos.data(dados.data_referencia())).replace("{cartoes}", cartoes)
 
     return servidor

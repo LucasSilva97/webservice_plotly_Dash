@@ -1,6 +1,7 @@
 """Página Diário de Vendas: realizado do mês corrente, tendência e meta."""
 from datetime import date
 
+import dash_bootstrap_components as dbc
 from dash import Input, Output, State, dcc, html
 
 from paineis.comercial import dados
@@ -32,29 +33,26 @@ def tom_atingimento(valor):
 
 def layout():
     marcas = ler_parquet("vendas_diarias")["marca"]
-    return html.Div([
-        html.Section(className="secao barra-filtros", children=[
+    return html.Div(className="vstack gap-3", children=[
+        c.barra_filtros(
             c.filtro("Vendedor", c.dropdown("cm-d-vendedor")),
             c.filtro("Canal", c.dropdown("cm-d-canal", options=[{"label": v, "value": k} for k, v in dados.CANAIS.items()])),
             c.filtro("Marca", c.dropdown("cm-d-marca", options=opcoes(marcas))),
-            html.Span(id="cm-d-periodo", className="nota"),
+            dbc.Col(html.Span(id="cm-d-periodo", className=c.NOTA), xs=12, lg=True),
+        ),
+        c.linha_cards("cm-d-cards"),
+        dbc.Row(className="g-3", children=[
+            dbc.Col(c.secao(graficos.grafico("cm-d-ritmo", 300), titulo="Ritmo do mês", className="h-100"), lg=6),
+            dbc.Col(c.secao(graficos.grafico("cm-d-marcas", 300), titulo="Realizado por marca x ano anterior (até a mesma data)",
+                            className="h-100"), lg=6),
         ]),
-        html.Div(id="cm-d-cards", className="cards"),
-        html.Div(className="graficos", children=[
-            html.Section(className="secao", children=[html.H2("Ritmo do mês"), graficos.grafico("cm-d-ritmo", 300)]),
-            html.Section(className="secao", children=[html.H2("Realizado por marca x ano anterior (até a mesma data)"),
-                                                      graficos.grafico("cm-d-marcas", 300)]),
-        ]),
-        html.Section(className="secao", children=[
-            html.Div(className="barra-tabela", children=[
-                html.H2("Desempenho por vendedor"),
-                html.Button("⬇ Exportar", id="cm-d-exportar", className="botao secundario"),
-            ]),
+        c.secao(
+            c.barra_tabela("Desempenho por vendedor", c.botao("⬇ Exportar", "cm-d-exportar")),
             c.grade("cm-d-grade", COLUNAS, altura=260),
-            html.P("A meta segue os filtros de vendedor e canal; ela não é aberta por marca. "
-                   "Tendência = realizado / dias úteis decorridos x dias úteis do mês.", className="nota"),
+            c.nota("A meta segue os filtros de vendedor e canal; ela não é aberta por marca. "
+                   "Tendência = realizado / dias úteis decorridos x dias úteis do mês."),
             dcc.Download(id="cm-d-download"),
-        ]),
+        ),
     ])
 
 

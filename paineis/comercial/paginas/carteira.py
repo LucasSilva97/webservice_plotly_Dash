@@ -2,6 +2,7 @@
 que existe nos outros filtros escolhidos)."""
 from datetime import date
 
+import dash_bootstrap_components as dbc
 from dash import ALL, Input, Output, State, ctx, dcc, html
 
 from paineis.comercial import dados
@@ -44,25 +45,21 @@ def colunas():
 def layout():
     filtros = [c.filtro(rotulo, c.dropdown({"tipo": "cm-c-filtro", "campo": campo}))
                for campo, rotulo in dados.FILTROS_CARTEIRA.items()]
-    return html.Div([
-        html.Section(className="secao barra-filtros", children=[
-            c.filtro("Situação", dcc.RadioItems(id="cm-c-situacao", options=["Ativo", "Inativo"], value="Ativo", className="radio-pilula")),
-            c.filtro("Classe", dcc.RadioItems(id="cm-c-classe", options=["Todos", "Grandes Redes", "Regular"], value="Todos", className="radio-pilula")),
+    return html.Div(className="vstack gap-3", children=[
+        c.barra_filtros(
+            dbc.Col(c.filtro("Situação", c.pilulas("cm-c-situacao", ["Ativo", "Inativo"], "Ativo")), xs=12, md="auto"),
+            dbc.Col(c.filtro("Classe", c.pilulas("cm-c-classe", ["Todos", "Grandes Redes", "Regular"], "Todos")), xs=12, md="auto"),
             *filtros,
-            html.Button("Limpar filtros", id="cm-c-limpar", className="botao secundario"),
-        ]),
-        html.Div(id="cm-c-cards", className="cards"),
-        html.Section(className="secao", children=[
-            html.Div(className="barra-tabela", children=[
-                html.H2("Carteira analítica de clientes"),
-                html.Button("⬇ Exportar", id="cm-c-exportar", className="botao secundario"),
-            ]),
+            dbc.Col(c.botao("Limpar filtros", "cm-c-limpar"), xs="auto"),
+        ),
+        c.linha_cards("cm-c-cards"),
+        c.secao(
+            c.barra_tabela("Carteira analítica de clientes", c.botao("⬇ Exportar", "cm-c-exportar")),
             c.grade("cm-c-grade", colunas(), altura=560, dashGridOptions={"pagination": True, "paginationPageSize": 50}),
-            html.P("Faturamento líquido dos 5 meses mais recentes (o último é o mês corrente, parcial). "
-                   "Média 3 meses = meses fechados. Filtros cruzados: cada lista só mostra o que existe nos demais filtros.",
-                   className="nota"),
+            c.nota("Faturamento líquido dos 5 meses mais recentes (o último é o mês corrente, parcial). "
+                   "Média 3 meses = meses fechados. Filtros cruzados: cada lista só mostra o que existe nos demais filtros."),
             dcc.Download(id="cm-c-download"),
-        ]),
+        ),
     ])
 
 

@@ -41,11 +41,11 @@ def opcoes_do_grupo(resposta, tipo):
 
 
 def card(cards, titulo):
-    """(valor, classe) do card com esse título."""
+    """(valor, classe) do card com esse título. Cada card vem numa coluna (dbc.Col > dbc.Card)."""
     for item in cards:
         partes = textos(item)
         if partes and partes[0] == titulo:
-            return partes[1], item["props"]["className"]
+            return partes[1], item["props"]["children"]["props"]["className"]
     raise AssertionError(f"card {titulo!r} não encontrado")
 
 
@@ -81,9 +81,9 @@ def test_estoque_base_contagem_muda_a_reposicao():
 def test_estoque_detalhe_do_transito(servidor):
     cliente, apps = servidor
     app = apps["estoque"]
-    r = chamar(cliente, "/estoque/", app, chave(app, "ep-detalhe-fundo.className"),
-               [{"colId": "qtd_transito", "value": 60, "rowId": "1002"}, None], [20], disparo="ep-grade.cellClicked")
-    assert r["ep-detalhe-fundo"]["className"] == "modal-fundo"
+    r = chamar(cliente, "/estoque/", app, chave(app, "ep-detalhe.is_open"),
+               [{"colId": "qtd_transito", "value": 60, "rowId": "1002"}], [20], disparo="ep-grade.cellClicked")
+    assert r["ep-detalhe"]["is_open"] is True
     notas = r["ep-grade-notas"]["rowData"]
     assert [(n["tipo"], n["origem"], n["qtd_caixas"]) for n in notas] == [("Transferência", "Andorinha Centro", 60)]
 
@@ -250,7 +250,7 @@ def test_credito_troca_de_aba_nao_exporta_nem_quebra(servidor):
                   saidas_grupo={'{"campo":["ALL"],"tipo":"cr-filtro"}': ids_inicio}) == {}
     # Botão de solicitação recém-montado com um cliente ainda guardado: o modal não abre sozinho.
     guardado = {"cliente_id": 20007, "revenda_id": 20, "nome": "teste", "limite_atual": 1500.0, "prazo_atual": "21 dias"}
-    assert chamar(cliente, "/credito/", app, chave(app, "cr-sol-fundo.className"), [None, None, None],
+    assert chamar(cliente, "/credito/", app, chave(app, "cr-sol.is_open"), [None, None],
                   [guardado, None, None, None, None], disparo="cr-abrir-solicitacao.n_clicks") == {}
 
 
